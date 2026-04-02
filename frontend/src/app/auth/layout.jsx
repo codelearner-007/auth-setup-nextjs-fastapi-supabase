@@ -7,24 +7,24 @@ export default function AuthLayout({ children }) {
 
   const highlights = [
     {
-      icon: Shield,
-      title: 'Authentication & MFA',
-      description: 'Email/password, SSO providers, and TOTP multi-factor authentication built in.',
-    },
-    {
-      icon: Key,
-      title: 'Role-Based Access Control',
-      description: 'Granular permissions across 4 modules with hierarchical role support.',
-    },
-    {
       icon: LayoutDashboard,
-      title: 'Admin Dashboard',
-      description: 'Full-featured admin panel with user management and system settings.',
+      title: 'Multi-Business Management',
+      description: 'Create and manage multiple businesses from a single account with isolated data per business.',
     },
     {
       icon: ScrollText,
-      title: 'Audit Trail',
-      description: 'Comprehensive logging with advanced filtering and export capabilities.',
+      title: 'Accounting & Bookkeeping',
+      description: 'Record income, expenses, invoices, and transactions for each business with ease.',
+    },
+    {
+      icon: Key,
+      title: 'Instant Reports',
+      description: 'Generate profit & loss, balance sheets, and custom financial reports per business in one click.',
+    },
+    {
+      icon: Shield,
+      title: 'Data Backup & Export',
+      description: 'Take full backups of your business data anytime and export to CSV or PDF for safekeeping.',
     },
   ];
 
@@ -54,10 +54,10 @@ export default function AuthLayout({ children }) {
         <div className="w-full flex items-center justify-center p-12">
           <div className="max-w-md">
             <h3 className="text-primary-foreground text-2xl font-bold mb-2">
-              Production-Ready SaaS Starter
+              Your Finances, All in One Place
             </h3>
             <p className="text-primary-foreground/70 text-sm mb-8">
-              Built with Next.js 16, FastAPI, Supabase, and Tailwind CSS v4.
+              Manage multiple businesses, track every transaction, and generate reports — effortlessly.
             </p>
 
             <div className="space-y-5">

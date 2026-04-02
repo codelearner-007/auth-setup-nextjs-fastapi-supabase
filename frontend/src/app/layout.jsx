@@ -12,7 +12,7 @@ const inter = Inter({
   variable: '--font-sans',
 });
 
-const productName = process.env.NEXT_PUBLIC_PRODUCTNAME || 'SaaS Starter';
+const productName = process.env.NEXT_PUBLIC_PRODUCTNAME || 'Bookvault';
 
 export const metadata = {
   title: {
