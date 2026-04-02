@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, Shield, Key, LayoutDashboard, ScrollText } from 'lucide-react';
 import { Providers } from '@/components/common/Providers';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export default function AuthLayout({ children }) {
   const productName = process.env.NEXT_PUBLIC_PRODUCTNAME || 'SaaS Starter';
@@ -38,6 +39,10 @@ export default function AuthLayout({ children }) {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Homepage
         </Link>
+
+        <div className="absolute right-8 top-8">
+          <ThemeToggle />
+        </div>
 
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
