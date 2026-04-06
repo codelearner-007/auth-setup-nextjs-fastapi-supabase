@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Building2,
   LayoutDashboard,
   Users,
   Settings,
@@ -12,10 +11,16 @@ import {
   Sliders,
   ArrowLeft,
   Menu,
-  X,
+  PanelLeftOpen,
+  PanelLeftClose,
+  Mail,
+  History,
+  Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { listBusinessTabs } from '@/lib/services/business.service';
 import BusinessOverview from './tabs/BusinessOverview';
 import BusinessMembers from './tabs/BusinessMembers';
@@ -38,28 +43,6 @@ const TAB_COMPONENTS = {
   settings: BusinessSettings,
 };
 
-function BusinessAvatar({ name, size = 'md' }) {
-  const letter = name ? name.charAt(0).toUpperCase() : '?';
-  const sizeClasses = size === 'lg' ? 'h-10 w-10 text-base' : 'h-8 w-8 text-sm';
-  return (
-    <div
-      className={`${sizeClasses} rounded-full bg-primary/10 border border-border flex items-center justify-center flex-shrink-0 select-none`}
-    >
-      <span className="font-semibold text-primary">{letter}</span>
-    </div>
-  );
-}
-
-function SidebarSkeleton() {
-  return (
-    <div className="space-y-1 px-3">
-      {[1, 2, 3, 4].map((i) => (
-        <Skeleton key={i} className="h-9 w-full rounded-lg" />
-      ))}
-    </div>
-  );
-}
-
 function TabContentSkeleton() {
   return (
     <div className="space-y-6">
@@ -77,12 +60,81 @@ function TabContentSkeleton() {
   );
 }
 
+function SidebarNavItem({ tab, isActive, isExpanded, isCustomizing, onClick }) {
+  const Icon = TAB_ICONS[tab.key] || LayoutDashboard;
+
+  const itemClass = [
+    'flex items-center rounded-lg transition-colors cursor-pointer',
+    isExpanded ? 'gap-3 px-3 py-2.5 w-full text-left' : 'justify-center h-10 w-10 mx-auto',
+    isActive
+      ? 'bg-primary text-primary-foreground shadow-sm'
+      : 'text-foreground hover:bg-muted',
+    isCustomizing ? 'cursor-default' : 'cursor-pointer',
+  ].join(' ');
+
+  const button = (
+    <button
+      key={tab.key}
+      type="button"
+      onClick={onClick}
+      className={itemClass}
+      aria-current={isActive ? 'page' : undefined}
+      tabIndex={isCustomizing ? -1 : 0}
+    >
+      <Icon className="h-4 w-4 flex-shrink-0" />
+      {isExpanded && (
+        <span className="text-sm font-medium truncate">{tab.label}</span>
+      )}
+    </button>
+  );
+
+  if (isExpanded) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {tab.label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function CustomizeNavItem({ isActive, isExpanded, onClick }) {
+  const itemClass = [
+    'flex items-center rounded-lg transition-colors cursor-pointer',
+    isExpanded ? 'gap-3 px-3 py-2.5 w-full text-left' : 'justify-center h-10 w-10 mx-auto',
+    isActive
+      ? 'bg-primary text-primary-foreground shadow-sm'
+      : 'text-foreground hover:bg-muted',
+  ].join(' ');
+
+  const button = (
+    <button type="button" onClick={onClick} className={itemClass}>
+      <Sliders className="h-4 w-4 flex-shrink-0" />
+      {isExpanded && <span className="text-sm font-medium">Customize</span>}
+    </button>
+  );
+
+  if (isExpanded) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        Customize
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function BusinessShellLayout({ business: initialBusiness, onBack }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [tabs, setTabs] = useState([]);
   const [tabsLoading, setTabsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [business, setBusiness] = useState(initialBusiness);
 
   const activeTab = searchParams.get('tab') || null;
@@ -123,7 +175,6 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
     setBusiness((prev) => ({ ...prev, ...updated }));
   }
 
-  // Called by BusinessCustomize after a successful save
   function handleTabsSaved(savedTabs) {
     setTabs(savedTabs);
   }
@@ -159,28 +210,27 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-background flex">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-20 lg:hidden"
-          onClick={closeSidebar}
-          aria-hidden="true"
-        />
-      )}
+    <TooltipProvider delayDuration={300}>
+      <div className="fixed inset-0 z-40 bg-background flex flex-col">
 
-      {/* Business sidebar */}
-      <aside
-        className={`w-64 bg-card border-r border-border flex-shrink-0 flex flex-col fixed inset-y-0 left-0 z-30 transition-transform duration-200
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:flex`}
-      >
-        {/* Back button */}
-        <div className="h-14 flex items-center px-4 border-b border-border/60">
+        {/* Zone 1: Top Bar */}
+        <header className="h-14 bg-card border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-30">
+          {/* Mobile: hamburger */}
+          <Button
+            onClick={() => setSidebarOpen(true)}
+            variant="ghost"
+            size="icon"
+            className="lg:hidden flex-shrink-0"
+            aria-label="Open business menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+
+          {/* Back button */}
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={() => {
-              closeSidebar();
               if (isCustomizing) {
                 const firstTab = tabs.find((t) => t.enabled);
                 if (firstTab) {
@@ -192,124 +242,166 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
                 onBack();
               }
             }}
-            className="gap-2 text-muted-foreground hover:text-foreground cursor-pointer px-2"
+            className="flex-shrink-0 text-muted-foreground hover:text-foreground"
             aria-label={isCustomizing ? 'Back to business' : 'Back to businesses'}
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
           </Button>
-          <Button
-            onClick={closeSidebar}
-            variant="ghost"
-            size="icon"
-            className="ml-auto h-8 w-8 lg:hidden"
-            aria-label="Close sidebar"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
 
-        {/* Business identity */}
-        <div className="px-4 py-4 border-b border-border/60">
-          <div className="flex items-center gap-3">
-            <BusinessAvatar name={business.name} size="lg" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate leading-tight">
-                {business.name}
-              </p>
-              {business.country && (
-                <p className="text-xs text-muted-foreground truncate">{business.country}</p>
-              )}
-            </div>
+          {/* Business name */}
+          <span className="text-base font-semibold text-foreground truncate min-w-0">
+            {business.name}
+          </span>
+
+          {/* Divider */}
+          <span className="text-border text-lg select-none flex-shrink-0">|</span>
+
+          {/* Active tab name + sidebar toggle */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="text-sm text-muted-foreground truncate">
+              {activeTab === 'customize'
+                ? 'Customize'
+                : enabledTabs.find((t) => t.key === activeTab)?.label || ''}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarExpanded((v) => !v)}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground flex-shrink-0 hidden lg:flex"
+                  aria-label={sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                >
+                  {sidebarExpanded ? (
+                    <PanelLeftClose className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftOpen className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+              </TooltipContent>
+            </Tooltip>
           </div>
-        </div>
 
-        {/* Business nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-            Business
-          </p>
-          {tabsLoading ? (
-            <SidebarSkeleton />
-          ) : enabledTabs.length === 0 ? (
-            <p className="text-xs text-muted-foreground px-2">No tabs configured.</p>
-          ) : (
-            <div className={`space-y-0.5 transition-opacity duration-200 ${isCustomizing ? 'opacity-40 pointer-events-none select-none' : ''}`}>
-              {enabledTabs.map((tab) => {
-                const Icon = TAB_ICONS[tab.key] || LayoutDashboard;
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => handleTabClick(tab.key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left
-                      ${isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-foreground hover:bg-muted'
-                      } ${isCustomizing ? 'cursor-default' : 'cursor-pointer'}`}
-                    aria-current={isActive ? 'page' : undefined}
-                    tabIndex={isCustomizing ? -1 : 0}
-                  >
-                    <Icon className="h-4 w-4 flex-shrink-0" />
-                    {tab.label}
-                  </button>
-                );
-              })}
+          {/* Right action buttons */}
+          {!isCustomizing ? (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5">
+                <Mail className="h-3.5 w-3.5" />
+                Emails
+              </Button>
+              <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5">
+                <History className="h-3.5 w-3.5" />
+                History
+              </Button>
+              <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5">
+                <Database className="h-3.5 w-3.5" />
+                Backup
+              </Button>
+              {/* Mobile: icon-only */}
+              <Button variant="outline" size="icon" className="sm:hidden h-8 w-8" aria-label="Emails">
+                <Mail className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="sm:hidden h-8 w-8" aria-label="History">
+                <History className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="sm:hidden h-8 w-8" aria-label="Backup">
+                <Database className="h-4 w-4" />
+              </Button>
             </div>
+          ) : (
+            <span className="text-sm text-muted-foreground flex-shrink-0">Customize Mode</span>
+          )}
+        </header>
+
+        {/* Body: sidebar + content */}
+        <div className="flex flex-1 min-h-0">
+
+          {/* Mobile overlay */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-20 lg:hidden"
+              onClick={closeSidebar}
+              aria-hidden="true"
+            />
           )}
 
-          {/* Customize — always visible */}
-          <div className="mt-4 pt-4 border-t border-border/60">
-            <button
-              type="button"
-              onClick={() => handleTabClick('customize')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer text-left
-                ${isCustomizing
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-foreground hover:bg-muted'
-                }`}
-            >
-              <Sliders className="h-4 w-4 flex-shrink-0" />
-              Customize
-            </button>
-          </div>
-        </nav>
-
-        {/* Sidebar footer */}
-        <div className="px-4 py-3 border-t border-border">
-          <div className="flex items-center gap-2 px-2">
-            <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <p className="text-xs text-muted-foreground truncate">Business workspace</p>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile top bar */}
-        <div className="sticky top-0 z-10 flex items-center h-14 bg-card/80 backdrop-blur-sm border-b border-border px-4 lg:hidden">
-          <Button
-            onClick={() => setSidebarOpen(true)}
-            variant="ghost"
-            size="icon"
-            aria-label="Open business menu"
+          {/* Zone 2: Sidebar */}
+          <aside
+            className={[
+              'bg-card border-r border-border flex flex-col flex-shrink-0 transition-all duration-200 z-30',
+              // Mobile: slide in/out overlay
+              'fixed inset-y-0 left-0 top-0 lg:relative lg:inset-auto lg:top-auto',
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+              // Desktop width
+              sidebarExpanded ? 'w-56' : 'lg:w-14',
+              // Mobile always full sidebar width when open
+              'w-56',
+            ].join(' ')}
           >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <div className="ml-3 flex items-center gap-2 min-w-0">
-            <BusinessAvatar name={business.name} />
-            <span className="text-sm font-semibold text-foreground truncate">{business.name}</span>
-          </div>
-        </div>
+            {/* Mobile-only header */}
+            <div className="h-14 flex items-center px-4 border-b border-border/60 flex-shrink-0 lg:hidden">
+              <span className="text-sm font-semibold text-foreground truncate">{business.name}</span>
+            </div>
 
-        {/* Page content */}
-        <main className="flex-1 p-6 lg:p-8 overflow-auto">
-          <div className="max-w-3xl mx-auto">
-            {tabContent}
-          </div>
-        </main>
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto pt-4 pb-3 flex flex-col gap-0.5 px-2">
+              <div
+                className={`flex flex-col gap-0.5 transition-opacity duration-200 ${
+                  isCustomizing ? 'opacity-40 pointer-events-none select-none' : ''
+                }`}
+              >
+                {tabsLoading ? (
+                  <div className="space-y-1 px-1">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-9 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : enabledTabs.length === 0 ? (
+                  sidebarExpanded && (
+                    <p className="text-xs text-muted-foreground px-3">No tabs configured.</p>
+                  )
+                ) : (
+                  enabledTabs.map((tab) => (
+                    <SidebarNavItem
+                      key={tab.key}
+                      tab={tab}
+                      isActive={activeTab === tab.key}
+                      isExpanded={sidebarExpanded}
+                      isCustomizing={isCustomizing}
+                      onClick={() => handleTabClick(tab.key)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Customize + Theme toggle — always at bottom */}
+              <div className={`mt-auto pt-3 border-t border-border/60 flex gap-1 ${sidebarExpanded ? 'flex-row items-center' : 'flex-col-reverse items-center'}`}>
+                <div className={sidebarExpanded ? 'flex-1' : ''}>
+                  <CustomizeNavItem
+                    isActive={isCustomizing}
+                    isExpanded={sidebarExpanded}
+                    onClick={() => {
+                      router.push('?tab=customize');
+                      setSidebarOpen(false);
+                    }}
+                  />
+                </div>
+                <ThemeToggle />
+              </div>
+            </nav>
+          </aside>
+
+          {/* Zone 4: Main content */}
+          <main className="flex-1 min-w-0 overflow-auto p-6 lg:p-8">
+            <div className="max-w-3xl mx-auto">
+              {tabContent}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
