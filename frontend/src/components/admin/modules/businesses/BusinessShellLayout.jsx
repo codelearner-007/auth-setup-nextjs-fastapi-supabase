@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Users,
   Settings,
-  BookOpen,
   BarChart2,
   Sliders,
   ArrowLeft,
@@ -17,6 +16,12 @@ import {
   History,
   Database,
   Building2,
+  Landmark,
+  FileText,
+  Receipt,
+  CreditCard,
+  ListTree,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,13 +37,16 @@ import BusinessChartOfAccounts from './tabs/BusinessChartOfAccounts';
 
 const TAB_ICONS = {
   summary: LayoutDashboard,
-  'journal-entries': BookOpen,
+  'bank-and-cash-accounts': Landmark,
+  'journal-entries': ScrollText,
   reports: BarChart2,
+  receipt: Receipt,
+  payments: CreditCard,
+  'chart-of-accounts': ListTree,
   settings: Settings,
   members: Users,
   overview: LayoutDashboard,
   'business-details': Building2,
-  'chart-of-accounts': BookOpen,
 };
 
 const TAB_COMPONENTS = {
@@ -53,6 +61,7 @@ const SETTINGS_PAGE_COMPONENTS = {
   'business-details': BusinessDetails,
   'chart-of-accounts': BusinessChartOfAccounts,
 };
+
 
 function TabContentSkeleton() {
   return (
@@ -76,7 +85,7 @@ function SidebarNavItem({ tab, isActive, isExpanded, isCustomizing, onClick }) {
 
   const itemClass = [
     'flex items-center rounded-lg transition-colors cursor-pointer',
-    isExpanded ? 'gap-3 px-3 py-2.5 w-full text-left' : 'justify-center h-10 w-10 mx-auto',
+    isExpanded ? 'gap-2.5 px-3 py-2 w-full text-left' : 'justify-center h-9 w-9 mx-auto',
     isActive
       ? 'bg-primary text-primary-foreground shadow-sm'
       : 'text-foreground hover:bg-muted',
@@ -92,9 +101,9 @@ function SidebarNavItem({ tab, isActive, isExpanded, isCustomizing, onClick }) {
       aria-current={isActive ? 'page' : undefined}
       tabIndex={isCustomizing ? -1 : 0}
     >
-      <Icon className="h-4 w-4 flex-shrink-0" />
+      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
       {isExpanded && (
-        <span className="text-sm font-medium truncate">{tab.label}</span>
+        <span className="text-xs font-medium leading-tight">{tab.label}</span>
       )}
     </button>
   );
@@ -114,7 +123,7 @@ function SidebarNavItem({ tab, isActive, isExpanded, isCustomizing, onClick }) {
 function CustomizeNavItem({ isActive, isExpanded, onClick }) {
   const itemClass = [
     'flex items-center rounded-lg transition-colors cursor-pointer',
-    isExpanded ? 'gap-3 px-3 py-2.5 w-full text-left' : 'justify-center h-10 w-10 mx-auto',
+    isExpanded ? 'gap-2.5 px-3 py-2 w-full text-left' : 'justify-center h-9 w-9 mx-auto',
     isActive
       ? 'bg-primary text-primary-foreground shadow-sm'
       : 'text-foreground hover:bg-muted',
@@ -122,8 +131,8 @@ function CustomizeNavItem({ isActive, isExpanded, onClick }) {
 
   const button = (
     <button type="button" onClick={onClick} className={itemClass}>
-      <Sliders className="h-4 w-4 flex-shrink-0" />
-      {isExpanded && <span className="text-sm font-medium">Customize</span>}
+      <Sliders className="h-3.5 w-3.5 flex-shrink-0" />
+      {isExpanded && <span className="text-xs font-medium leading-tight">Customize</span>}
     </button>
   );
 

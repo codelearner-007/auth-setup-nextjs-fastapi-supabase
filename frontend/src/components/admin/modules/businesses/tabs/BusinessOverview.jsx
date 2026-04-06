@@ -1,87 +1,136 @@
 'use client';
 
-import { Building2, Users, Settings, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { listCoaGroups, listCoaAccounts } from '@/lib/services/coa.service';
 
-function StatCard({ icon: Icon, label, value, loading }) {
+function CoaSkeleton() {
   return (
-    <Card className="border-border">
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-              {label}
-            </p>
-            {loading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : (
-              <p className="text-2xl font-bold text-foreground">{value}</p>
-            )}
-          </div>
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Icon className="h-4 w-4 text-primary" />
-          </div>
+    <div className="grid grid-cols-1 xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-border gap-0">
+      {[0, 1].map((i) => (
+        <div key={i} className={`space-y-3 ${i === 0 ? 'pb-8 xl:pb-0 xl:pr-8' : 'pt-8 xl:pt-0 xl:pl-8'}`}>
+          <Skeleton className="h-4 w-32 mx-auto" />
+          {[1, 2, 3].map((j) => (
+            <div key={j} className="rounded-xl border border-border overflow-hidden">
+              <Skeleton className="h-11 w-full rounded-none" />
+              <Skeleton className="h-9 w-full rounded-none opacity-60" />
+              <Skeleton className="h-9 w-full rounded-none opacity-40" />
+            </div>
+          ))}
         </div>
-      </CardContent>
-    </Card>
+      ))}
+    </div>
   );
 }
 
-export default function BusinessOverview({ business }) {
-  const stats = [
-    { icon: Users, label: 'Members', value: '—' },
-    { icon: TrendingUp, label: 'Activity', value: '—' },
-    { icon: Settings, label: 'Integrations', value: '—' },
-  ];
+function GroupCard({ group, accounts }) {
+  const groupAccounts = accounts.filter((a) => a.group_id === group.id);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">{business.name}</h2>
-        {business.country && (
-          <p className="text-sm text-muted-foreground mt-0.5">{business.country}</p>
-        )}
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+        <span className="text-sm font-bold text-foreground">{group.name}</span>
+        <span className="text-sm font-semibold text-foreground tabular-nums">—</span>
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} loading={false} />
-        ))}
-      </div>
-
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Business Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between py-2 border-b border-border/60">
-            <span className="text-sm text-muted-foreground">Name</span>
-            <span className="text-sm font-medium text-foreground">{business.name}</span>
+      {groupAccounts.length === 0 ? (
+        <div className="px-4 py-3 text-xs text-muted-foreground">No accounts</div>
+      ) : (
+        groupAccounts.map((account) => (
+          <div
+            key={account.id}
+            className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 last:border-0"
+          >
+            <span
+              className={
+                account.is_total
+                  ? 'text-xs text-muted-foreground italic'
+                  : 'text-sm text-muted-foreground'
+              }
+            >
+              {account.name}
+            </span>
+            <span
+              className={
+                account.is_total
+                  ? 'text-xs font-medium text-primary tabular-nums'
+                  : 'text-sm text-foreground tabular-nums'
+              }
+            >
+              —
+            </span>
           </div>
-          {business.country && (
-            <div className="flex items-center justify-between py-2 border-b border-border/60">
-              <span className="text-sm text-muted-foreground">Country</span>
-              <span className="text-sm font-medium text-foreground">{business.country}</span>
-            </div>
-          )}
-          {business.created_at && (
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-muted-foreground">Created</span>
-              <span className="text-sm font-medium text-foreground tabular-nums">
-                {new Intl.DateTimeFormat('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                }).format(new Date(business.created_at))}
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        ))
+      )}
+    </div>
+  );
+}
+
+function NetProfitRow() {
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-sm font-bold text-foreground">Net profit (loss)</span>
+        <span className="text-sm font-semibold text-foreground tabular-nums">—</span>
+      </div>
+    </div>
+  );
+}
+
+export default function BusinessFinancialSummary({ business }) {
+  const [groups, setGroups] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [groupsData, accountsData] = await Promise.all([
+        listCoaGroups(business.id),
+        listCoaAccounts(business.id),
+      ]);
+      setGroups(groupsData.items || groupsData || []);
+      setAccounts(accountsData.items || accountsData || []);
+    } catch {
+      setGroups([]);
+      setAccounts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [business.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (isLoading) return <CoaSkeleton />;
+
+  const bsGroups = groups.filter((g) => g.type === 'balance_sheet');
+  const plGroups = groups.filter((g) => g.type === 'pl');
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-border">
+        {/* Left: Balance Sheet */}
+        <div className="pb-8 xl:pb-0 xl:pr-8 space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center pb-2 border-b border-border">
+            Balance Sheet
+          </p>
+          {bsGroups.map((group) => (
+            <GroupCard key={group.id} group={group} accounts={accounts} />
+          ))}
+        </div>
+
+        {/* Right: P&L */}
+        <div className="pt-8 xl:pt-0 xl:pl-8 space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center pb-2 border-b border-border">
+            Profit and Loss Statement
+          </p>
+          {plGroups.map((group) => (
+            <GroupCard key={group.id} group={group} accounts={accounts} />
+          ))}
+          <NetProfitRow />
+        </div>
+      </div>
     </div>
   );
 }

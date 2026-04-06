@@ -198,7 +198,14 @@ class BusinessService:
                 continue
             biz_row = biz_map.get(admin_tab.key)
             if biz_row:
-                items.append((biz_row.order_index, BusinessTabResponse.model_validate(biz_row)))
+                items.append((biz_row.order_index, BusinessTabResponse(
+                    id=str(biz_row.id),
+                    business_id=business_id,
+                    key=biz_row.key,
+                    label=admin_tab.label,
+                    enabled=biz_row.enabled,
+                    order_index=biz_row.order_index,
+                )))
             else:
                 fallback_idx = admin_map[admin_tab.key][0]
                 items.append((fallback_idx, BusinessTabResponse(
@@ -226,21 +233,25 @@ class BusinessService:
                 detail="Business not found",
             )
         admin_tabs = await self.repo.list_admin_tabs()
+        admin_tab_map = {t.key: t for t in admin_tabs}
         allowed = {t.key: t.enabled for t in admin_tabs}
         for idx, item in enumerate(items):
             if not allowed.get(item.key, True):
                 continue
+            admin_tab = admin_tab_map.get(item.key)
+            canonical_label = admin_tab.label if admin_tab else item.key
             row = await self.repo.get_business_tab_by_key(business_id, item.key)
             if not row:
                 row = BusinessTab(
                     business_id=business_id,
                     key=item.key,
-                    label=item.key,
+                    label=canonical_label,
                     enabled=item.enabled,
                     order_index=idx,
                 )
                 self.repo.session.add(row)
             else:
+                row.label = canonical_label
                 row.enabled = item.enabled
                 row.order_index = idx
         await self.repo.session.flush()
