@@ -64,6 +64,44 @@ class BusinessService:
             )
         return BusinessResponse.model_validate(business)
 
+    async def update(
+        self,
+        business_id: str,
+        owner_id: str,
+        name: str,
+        country: str | None,
+        address: str | None,
+    ) -> BusinessResponse:
+        """Update business name/country and upsert address in business_details."""
+        business = await self.repo.get_by_owner(business_id, owner_id)
+        if not business:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Business not found",
+            )
+        business.name = name
+        business.country = country
+        business.updated_at = datetime.now(timezone.utc)
+        await self.repo.session.flush()
+        details = await self.repo.upsert_details(business_id, address)
+        response = BusinessResponse.model_validate(business)
+        response.address = details.address
+        return response
+
+    async def reset(self, business_id: str, owner_id: str) -> BusinessResponse:
+        """Reset business country and address to null (name is preserved)."""
+        business = await self.repo.get_by_owner(business_id, owner_id)
+        if not business:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Business not found",
+            )
+        business.country = None
+        business.updated_at = datetime.now(timezone.utc)
+        await self.repo.session.flush()
+        await self.repo.upsert_details(business_id, None)
+        return BusinessResponse.model_validate(business)
+
     async def delete(self, business_id: str, owner_id: str) -> str:
         """Soft-delete a business owned by owner, raising 404 if absent or not owned. Returns the business name."""
         business = await self.repo.get_by_owner(business_id, owner_id)

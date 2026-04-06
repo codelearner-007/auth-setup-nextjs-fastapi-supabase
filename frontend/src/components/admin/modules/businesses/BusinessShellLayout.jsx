@@ -16,6 +16,7 @@ import {
   Mail,
   History,
   Database,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +27,8 @@ import BusinessOverview from './tabs/BusinessOverview';
 import BusinessMembers from './tabs/BusinessMembers';
 import BusinessSettings from './tabs/BusinessSettings';
 import BusinessCustomize from './tabs/BusinessCustomize';
+import BusinessDetails from './tabs/BusinessDetails';
+import BusinessChartOfAccounts from './tabs/BusinessChartOfAccounts';
 
 const TAB_ICONS = {
   summary: LayoutDashboard,
@@ -34,6 +37,8 @@ const TAB_ICONS = {
   settings: Settings,
   members: Users,
   overview: LayoutDashboard,
+  'business-details': Building2,
+  'chart-of-accounts': BookOpen,
 };
 
 const TAB_COMPONENTS = {
@@ -41,6 +46,8 @@ const TAB_COMPONENTS = {
   overview: BusinessOverview,
   members: BusinessMembers,
   settings: BusinessSettings,
+  'business-details': BusinessDetails,
+  'chart-of-accounts': BusinessChartOfAccounts,
 };
 
 function TabContentSkeleton() {

@@ -1,10 +1,13 @@
 """Business repository — data access layer for the businesses table."""
 
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.admin_tab import AdminTab
 from app.models.business import Business
+from app.models.business_details import BusinessDetails
 from app.models.business_tab import BusinessTab
 from app.repositories.base_repository import BaseRepository
 
@@ -72,6 +75,25 @@ class BusinessRepository(BaseRepository[Business]):
         business = result.scalar_one_or_none()
         if business:
             await self.delete(business)
+
+    async def get_details(self, business_id: str) -> BusinessDetails | None:
+        """Return the business_details row for the given business, or None."""
+        result = await self.session.execute(
+            select(BusinessDetails).where(BusinessDetails.business_id == business_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def upsert_details(self, business_id: str, address: str | None) -> BusinessDetails:
+        """Insert or update the business_details row for the given business."""
+        details = await self.get_details(business_id)
+        if details is None:
+            details = BusinessDetails(business_id=business_id, address=address)
+            self.session.add(details)
+        else:
+            details.address = address
+            details.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        return details
 
     async def list_admin_tabs(self) -> list[AdminTab]:
         """Return all admin tabs ordered by order_index then id."""

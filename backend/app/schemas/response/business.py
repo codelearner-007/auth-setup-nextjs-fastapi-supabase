@@ -13,6 +13,7 @@ class BusinessResponse(BaseModel):
     id: str
     name: str
     country: str | None
+    address: str | None = None
     owner_id: str
     created_at: datetime
     updated_at: datetime

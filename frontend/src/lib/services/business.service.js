@@ -43,3 +43,11 @@ export async function listAdminTabs() {
 export async function updateAdminTabs(items) {
   return apiClient.put('/v1/admin-tabs', { items });
 }
+
+export async function updateBusiness(id, data) {
+  return apiClient.put(`/v1/businesses/${id}`, data);
+}
+
+export async function resetBusiness(id) {
+  return apiClient.post(`/v1/businesses/${id}/reset`, {});
+}

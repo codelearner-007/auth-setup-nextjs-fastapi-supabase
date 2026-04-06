@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_db, require_role
 from app.schemas.auth import CurrentUser
-from app.schemas.request.business import CreateBusinessRequest
+from app.schemas.request.business import CreateBusinessRequest, UpdateBusinessRequest
 from app.schemas.request.tab import UpsertBusinessTabsRequest
 from app.schemas.response.business import BusinessListResponse, BusinessResponse
 from app.schemas.response.tab import BusinessTabListResponse
@@ -166,6 +166,66 @@ async def restore_business(
     )
 
     return restored_business
+
+
+@router.put(
+    "/{business_id}",
+    response_model=BusinessResponse,
+    dependencies=[Depends(require_role("admin", "super_admin"))],
+)
+async def update_business(
+    business_id: str,
+    body: UpdateBusinessRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> BusinessResponse:
+    """Update business name, country, and address."""
+    service = BusinessService(db)
+    business = await service.update(
+        business_id=business_id,
+        owner_id=str(current_user.user_id),
+        name=body.name,
+        country=body.country,
+        address=body.address,
+    )
+
+    audit_service = AuditService(db)
+    await audit_service.log_action(
+        user_id=current_user.user_id,
+        action="business_updated",
+        module="businesses",
+        resource_id=str(business_id),
+        details={"name": body.name, "country": body.country, "address": body.address},
+    )
+
+    return business
+
+
+@router.post(
+    "/{business_id}/reset",
+    response_model=BusinessResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role("admin", "super_admin"))],
+)
+async def reset_business(
+    business_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> BusinessResponse:
+    """Reset business country and address to null."""
+    service = BusinessService(db)
+    business = await service.reset(business_id, str(current_user.user_id))
+
+    audit_service = AuditService(db)
+    await audit_service.log_action(
+        user_id=current_user.user_id,
+        action="business_reset",
+        module="businesses",
+        resource_id=str(business_id),
+        details={"name": business.name},
+    )
+
+    return business
 
 
 @router.get(
