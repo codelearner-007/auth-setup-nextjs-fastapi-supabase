@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { LayoutDashboard, ClipboardList, User, Building2, LogOut, Menu, X, ChevronDown } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,23 @@ function getInitials(email) {
     : parts[0].slice(0, 2).toUpperCase();
 }
 
+const ADMIN_LAST_PATH_KEY = 'admin_last_path';
+
+function AdminPathTracker() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const search = searchParams.toString();
+    const fullPath = search ? `${pathname}?${search}` : pathname;
+    if (fullPath.startsWith('/admin')) {
+      window.sessionStorage.setItem(ADMIN_LAST_PATH_KEY, fullPath);
+    }
+  }, [pathname, searchParams]);
+
+  return null;
+}
+
 export default function AdminShellLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
@@ -52,6 +69,9 @@ export default function AdminShellLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-muted/30 flex">
+      <Suspense fallback={null}>
+        <AdminPathTracker />
+      </Suspense>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div

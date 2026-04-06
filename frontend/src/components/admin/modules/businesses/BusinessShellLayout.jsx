@@ -46,6 +46,10 @@ const TAB_COMPONENTS = {
   overview: BusinessOverview,
   members: BusinessMembers,
   settings: BusinessSettings,
+};
+
+// Sub-pages rendered under the Settings tab via ?tab=settings&page=<key>
+const SETTINGS_PAGE_COMPONENTS = {
   'business-details': BusinessDetails,
   'chart-of-accounts': BusinessChartOfAccounts,
 };
@@ -141,13 +145,17 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
   const [tabs, setTabs] = useState([]);
   const [tabsLoading, setTabsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('business-sidebar-expanded') === 'true';
+  });
   const [business, setBusiness] = useState(initialBusiness);
 
   const activeTab = searchParams.get('tab') || null;
+  const activePage = searchParams.get('page') || null;
   const isCustomizing = activeTab === 'customize';
 
-  const fetchTabs = useCallback(async () => {
+  const fetchTabs = useCallback(async (currentTab) => {
     setTabsLoading(true);
     try {
       const data = await listBusinessTabs(business.id);
@@ -155,7 +163,8 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
       setTabs(items);
       const enabledTabs = items.filter((t) => t.enabled);
       const currentTabValid =
-        enabledTabs.some((t) => t.key === activeTab) || activeTab === 'customize';
+        enabledTabs.some((t) => t.key === currentTab) ||
+        currentTab === 'customize';
       if (!currentTabValid && enabledTabs.length > 0) {
         router.replace(`?tab=${enabledTabs[0].key}`);
       }
@@ -167,8 +176,8 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
   }, [business.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    fetchTabs();
-  }, [fetchTabs]);
+    fetchTabs(activeTab);
+  }, [fetchTabs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabClick = (key) => {
     if (isCustomizing) return;
@@ -200,13 +209,25 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
         onSaved={handleTabsSaved}
       />
     );
+  } else if (activeTab === 'settings' && activePage) {
+    const PageComponent = SETTINGS_PAGE_COMPONENTS[activePage];
+    tabContent = PageComponent ? (
+      <PageComponent
+        business={business}
+        onBusinessUpdated={handleBusinessUpdated}
+      />
+    ) : (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-sm font-semibold text-foreground">Page not found</p>
+      </div>
+    );
   } else if (activeTab) {
     const Component = TAB_COMPONENTS[activeTab];
     tabContent = Component ? (
       <Component
         business={business}
         onBusinessUpdated={handleBusinessUpdated}
-        onTabsChanged={fetchTabs}
+        onTabsChanged={() => fetchTabs(activeTab)}
       />
     ) : (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -275,7 +296,11 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setSidebarExpanded((v) => !v)}
+                  onClick={() => setSidebarExpanded((v) => {
+                    const next = !v;
+                    localStorage.setItem('business-sidebar-expanded', String(next));
+                    return next;
+                  })}
                   className="h-7 w-7 text-muted-foreground hover:text-foreground flex-shrink-0 hidden lg:flex"
                   aria-label={sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
                 >
@@ -403,9 +428,7 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
 
           {/* Zone 4: Main content */}
           <main className="flex-1 min-w-0 overflow-auto p-6 lg:p-8">
-            <div className="max-w-3xl mx-auto">
-              {tabContent}
-            </div>
+            {tabContent}
           </main>
         </div>
       </div>

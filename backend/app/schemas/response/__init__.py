@@ -1,6 +1,12 @@
 """Response schemas for API output serialization."""
 
 from app.schemas.response.audit import AuditLogResponse
+from app.schemas.response.coa import (
+    CoaAccountListResponse,
+    CoaAccountResponse,
+    CoaGroupListResponse,
+    CoaGroupResponse,
+)
 from app.schemas.response.auth import CurrentUserResponse
 from app.schemas.response.business import BusinessListResponse, BusinessResponse
 from app.schemas.response.dashboard import DashboardStatsResponse
@@ -24,6 +30,10 @@ __all__ = [
     "AdminTabResponse",
     "AuditLogResponse",
     "BusinessListResponse",
+    "CoaAccountListResponse",
+    "CoaAccountResponse",
+    "CoaGroupListResponse",
+    "CoaGroupResponse",
     "BusinessResponse",
     "BusinessTabListResponse",
     "BusinessTabResponse",

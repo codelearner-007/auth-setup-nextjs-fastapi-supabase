@@ -1,6 +1,6 @@
 """CoaAccount model — Chart of Accounts leaf account."""
 
-from sqlalchemy import ForeignKey, Integer, Text, text
+from sqlalchemy import Boolean, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,6 +32,9 @@ class CoaAccount(Base, TimestampMixin):
         index=True,
     )
     cash_flow_category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    type: Mapped[str] = mapped_column(Text, nullable=False, default="pl")
+    is_total: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_fixed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     def __repr__(self) -> str:

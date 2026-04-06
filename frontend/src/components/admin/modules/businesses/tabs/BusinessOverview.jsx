@@ -36,7 +36,7 @@ export default function BusinessOverview({ business }) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div>
         <h2 className="text-xl font-bold text-foreground">{business.name}</h2>
         {business.country && (

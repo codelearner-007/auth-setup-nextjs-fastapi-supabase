@@ -331,6 +331,9 @@ async def list_roles(db: AsyncSession = Depends()):
 13. **Next.js 16 sync params** → `params` and `searchParams` are `Promise<>` types, must be `await`ed
 14. **Hardcoded Tailwind colors** → Use semantic tokens: `bg-primary`, `text-destructive`, `bg-muted`
 15. **`GRANT ALL` to anon/authenticated** → Use principle of least privilege; service_role for backend CRUD
+16. **Admin loses page on reload** → Always persist the current admin route (pathname + search params) to `sessionStorage` and restore it on load — admin must be redirected to the exact same page/tab they were on before reload
+17. **Business shell — tabs vs sub-pages** → `?tab=X` is a sidebar tab (exists in `admin_tabs` DB). Sub-pages under a tab use `?tab=X&page=Y` — they are NOT sidebar tabs, NOT in `admin_tabs`, and rendered via `SETTINGS_PAGE_COMPONENTS`. Example: `?tab=settings&page=chart-of-accounts`. The redirect guard in `fetchTabs` only validates the `tab` param — `settings` is valid so no redirect fires, and `page` selects which component renders inside it.
+18. **`useCallback` stale closure in shell** → Never read `activeTab`/`activePage` inside a `useCallback` with suppressed deps. Pass them as explicit parameters: `fetchTabs(activeTab)` not `fetchTabs()`. Otherwise the closure captures `null` at mount and the redirect guard always fires.
 
 ---
 
@@ -618,3 +621,6 @@ Component → Service → API Route (Next.js or FastAPI)
 14. **Next.js 16: params/searchParams are Promise types**
 15. **Rate limiting via slowapi on sensitive endpoints**
 16. **Clean, simple & fast** - every file must pass the Code Quality checklist above
+17. **Admin reload must restore last page** - persist full URL (pathname + search params) to `sessionStorage` on every navigation; on app load redirect admin to the stored URL so they land on the same page/tab after a reload
+18. **Business shell navigation model** - sidebar tabs use `?tab=X` (must exist in `admin_tabs` DB + `TAB_COMPONENTS`). Sub-pages under a tab use `?tab=X&page=Y` (NOT in `admin_tabs`, rendered via `SETTINGS_PAGE_COMPONENTS`). The `fetchTabs` redirect guard only validates `tab`, never `page`. On refresh `activeTab` is always the sidebar tab key (`settings`), which is valid — no redirect. The `page` param then selects the sub-component.
+19. **Never use stale closures for current route in shell** - `fetchTabs` and similar callbacks must receive `activeTab`/`activePage` as parameters, not close over them. eslint-disable on hook deps is a code smell that hides this bug.

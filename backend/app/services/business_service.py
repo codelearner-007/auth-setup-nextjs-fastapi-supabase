@@ -9,6 +9,7 @@ from app.models.admin_tab import AdminTab
 from app.models.business import Business
 from app.models.business_tab import BusinessTab
 from app.repositories.business_repository import BusinessRepository
+from app.repositories.coa_repository import CoaRepository
 from app.schemas.request.tab import AdminTabUpsertItem, BusinessTabUpdateItem
 from app.schemas.response.business import BusinessListResponse, BusinessResponse
 from app.schemas.response.tab import (
@@ -49,9 +50,10 @@ class BusinessService:
         name: str,
         country: str | None,
     ) -> BusinessResponse:
-        """Create a new business and return its representation."""
+        """Create a new business, seed its default COA, and return its representation."""
         business = Business(name=name, country=country, owner_id=owner_id)
         created = await self.repo.create(business)
+        await CoaRepository(self.repo.session).seed_default_coa(str(created.id))
         return BusinessResponse.model_validate(created)
 
     async def get(self, business_id: str, owner_id: str) -> BusinessResponse:

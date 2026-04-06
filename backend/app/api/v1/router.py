@@ -7,6 +7,7 @@ from app.api.v1 import (
     audit,
     auth,
     businesses,
+    coa,
     dashboard,
     modules,
     permissions,
@@ -30,4 +31,5 @@ api_router.include_router(audit.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(modules.router)
 api_router.include_router(businesses.router)
+api_router.include_router(coa.router)
 api_router.include_router(admin_tabs.router)

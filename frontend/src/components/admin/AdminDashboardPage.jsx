@@ -1,11 +1,15 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { User, ShieldCheck, Calendar, Building2, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGlobal } from '@/lib/context/GlobalContext';
+
+const ADMIN_LAST_PATH_KEY = 'admin_last_path';
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
@@ -45,7 +49,15 @@ function InfoCard({ icon: Icon, title, children }) {
 }
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const { user, loading } = useGlobal();
+
+  useEffect(() => {
+    const stored = window.sessionStorage.getItem(ADMIN_LAST_PATH_KEY);
+    if (stored && stored !== '/admin') {
+      router.replace(stored);
+    }
+  }, [router]);
 
   const status = getStatusBadge(user);
   const roleName = user?.app_metadata?.user_role || 'user';

@@ -15,7 +15,6 @@ const SETTING_PAGES = [
     label: 'Chart of Accounts',
     description: 'Manage your chart of accounts.',
     icon: BookOpen,
-    comingSoon: true,
   },
 ];
 
@@ -23,7 +22,7 @@ export default function BusinessSettings({ business }) {
   const router = useRouter();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div>
         <h2 className="text-xl font-bold text-foreground">Settings</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
@@ -36,7 +35,7 @@ export default function BusinessSettings({ business }) {
           <button
             key={key}
             type="button"
-            onClick={() => !comingSoon && router.push(`?tab=${key}`)}
+            onClick={() => !comingSoon && router.push(`?tab=settings&page=${key}`)}
             className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg border border-border bg-card text-left transition-colors
               ${comingSoon ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted cursor-pointer'}`}
           >
