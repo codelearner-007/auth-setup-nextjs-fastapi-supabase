@@ -160,6 +160,8 @@ const DEFAULT_COLS = [
   { key: 'received_in', label: 'Received In', visible: false, locked: false },
   { key: 'description', label: 'Description', visible: false, locked: false },
   { key: 'attachment',  label: 'Attachment',  visible: false, locked: false },
+  { key: 'qty',         label: 'Quantity',    visible: false, locked: false },
+  { key: 'discount',    label: 'Discount',    visible: false, locked: false },
   { key: 'amount',      label: 'Amount',      visible: true,  locked: true  },
 ];
 
@@ -1517,49 +1519,47 @@ export default function BusinessReceipts({ business }) {
           )}
         </table>
 
-        {/* Footer bar + inline column editor */}
-        <div className="border-t border-border">
-          <div className="bg-muted/20 px-4 py-2 flex items-center justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground h-7"
-              onClick={openColEditor}
-            >
-              <Columns className="h-3.5 w-3.5" />
-              Edit columns
-            </Button>
-          </div>
-
-          {colEditorOpen && (
-            <div className="border-t border-border">
-              <div className="px-4 py-2.5 bg-muted/30 border-b border-border flex items-center justify-between">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Columns</span>
-                <span className="text-xs text-muted-foreground">Drag to reorder</span>
-              </div>
-              <DndContext sensors={colSensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
-                <SortableContext items={draftCols.map((c) => c.key)} strategy={verticalListSortingStrategy}>
-                  {draftCols.map((col, idx) => (
-                    <SortableColRow
-                      key={col.key}
-                      col={col}
-                      onToggle={toggleDraftCol}
-                      isLast={idx === draftCols.length - 1}
-                    />
-                  ))}
-                </SortableContext>
-              </DndContext>
-              <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center gap-2">
-                <Button size="sm" className="cursor-pointer h-7 text-xs" onClick={applyColEditor}>
-                  Update
-                </Button>
-                <Button variant="ghost" size="sm" className="cursor-pointer h-7 text-xs text-muted-foreground" onClick={cancelColEditor}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
+        {/* Footer bar */}
+        <div className="border-t border-border bg-muted/20 px-4 py-2 flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground h-7"
+            onClick={openColEditor}
+          >
+            <Columns className="h-3.5 w-3.5" />
+            Edit columns
+          </Button>
         </div>
+
+        {/* Column editor dialog */}
+        <Dialog open={colEditorOpen} onOpenChange={(v) => { if (!v) cancelColEditor(); }}>
+          <DialogContent className="w-64 p-0 gap-0 overflow-hidden">
+            <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30">
+              <DialogTitle className="text-sm font-semibold">Edit Columns</DialogTitle>
+            </DialogHeader>
+            <DndContext sensors={colSensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
+              <SortableContext items={draftCols.map((c) => c.key)} strategy={verticalListSortingStrategy}>
+                {draftCols.map((col, idx) => (
+                  <SortableColRow
+                    key={col.key}
+                    col={col}
+                    onToggle={toggleDraftCol}
+                    isLast={idx === draftCols.length - 1}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+            <DialogFooter className="px-4 py-3 border-t border-border bg-muted/20 flex-row gap-2 sm:justify-start">
+              <Button size="sm" className="cursor-pointer h-7 text-xs" onClick={applyColEditor}>
+                Apply
+              </Button>
+              <Button variant="ghost" size="sm" className="cursor-pointer h-7 text-xs text-muted-foreground" onClick={cancelColEditor}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
