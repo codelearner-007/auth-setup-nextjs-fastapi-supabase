@@ -7,11 +7,11 @@ import { getSuspenseBalance } from '@/lib/services/suspense.service';
 import { listBankAccounts } from '@/lib/services/bank-accounts.service';
 import BusinessSuspense from './BusinessSuspense';
 
-const CASH_GROUP_KEYWORDS = ['cash', 'bank', 'cash and cash equivalents', 'cash & cash equivalents'];
+const CASH_ACCOUNT_KEYWORDS = ['cash', 'bank', 'cash and cash equivalents', 'cash & cash equivalents', 'cash equilent', 'cash equivalent'];
 
-function isCashGroup(groupName) {
-  const lower = (groupName ?? '').toLowerCase().trim();
-  return CASH_GROUP_KEYWORDS.some((kw) => lower === kw || lower.includes(kw));
+function isCashAccount(accountName) {
+  const lower = (accountName ?? '').toLowerCase().trim();
+  return CASH_ACCOUNT_KEYWORDS.some((kw) => lower === kw || lower.includes(kw));
 }
 
 function formatAmount(value) {
@@ -40,8 +40,9 @@ function CoaSkeleton() {
 
 function GroupCard({ group, accounts, bankTotal }) {
   const groupAccounts = accounts.filter((a) => a.group_id === group.id);
-  const showBankTotal = bankTotal !== null && isCashGroup(group.name);
-  const groupTotal = showBankTotal ? bankTotal : null;
+  const groupTotal = bankTotal !== null && groupAccounts.some((a) => isCashAccount(a.name))
+    ? bankTotal
+    : null;
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
@@ -75,7 +76,7 @@ function GroupCard({ group, accounts, bankTotal }) {
                   : 'text-sm text-foreground tabular-nums'
               }
             >
-              —
+              {isCashAccount(account.name) && bankTotal !== null ? formatAmount(bankTotal) : '—'}
             </span>
           </div>
         ))
