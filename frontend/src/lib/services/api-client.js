@@ -1,11 +1,18 @@
 import { toErrorMessage } from '@/lib/utils/api-errors';
 import { createSPAClient } from '@/lib/supabase/client';
 
+let _tokenCache = null;
+let _tokenCacheExpiry = 0;
+
 async function getAccessToken() {
+  const now = Date.now();
+  if (_tokenCache && now < _tokenCacheExpiry) return _tokenCache;
   try {
     const supabase = createSPAClient();
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token ?? null;
+    _tokenCache = session?.access_token ?? null;
+    _tokenCacheExpiry = now + 30_000;
+    return _tokenCache;
   } catch {
     return null;
   }

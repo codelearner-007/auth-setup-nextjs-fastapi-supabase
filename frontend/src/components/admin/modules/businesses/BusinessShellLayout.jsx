@@ -172,9 +172,11 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
 
   const activeTab = searchParams.get('tab') || null;
   const activePage = searchParams.get('page') || null;
+
+  const [mountedTabs, setMountedTabs] = useState(() => new Set([activeTab].filter(Boolean)));
   const isCustomizing = activePage === 'customize';
 
-  const fetchTabs = useCallback(async (currentTab) => {
+  const fetchTabs = useCallback(async (currentTab, currentPage) => {
     setTabsLoading(true);
     try {
       const data = await listBusinessTabs(business.id);
@@ -183,8 +185,8 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
       const enabledTabs = items.filter((t) => t.enabled);
       const currentTabValid =
         enabledTabs.some((t) => t.key === currentTab) ||
-        activePage === 'customize' ||
-        activePage === 'history';
+        currentPage === 'customize' ||
+        currentPage === 'history';
       if (!currentTabValid && enabledTabs.length > 0) {
         router.replace(`?tab=${enabledTabs[0].key}`);
       }
@@ -193,11 +195,22 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
     } finally {
       setTabsLoading(false);
     }
-  }, [business.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [business.id, router]);
 
   useEffect(() => {
-    fetchTabs(activeTab);
+    fetchTabs(activeTab, activePage);
   }, [fetchTabs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeTab) {
+      setMountedTabs((prev) => {
+        if (prev.has(activeTab)) return prev;
+        const next = new Set(prev);
+        next.add(activeTab);
+        return next;
+      });
+    }
+  }, [activeTab]);
 
   const handleTabClick = (key) => {
     router.push(`?tab=${key}`);
@@ -244,13 +257,22 @@ export default function BusinessShellLayout({ business: initialBusiness, onBack 
       </div>
     );
   } else if (activeTab) {
-    const Component = TAB_COMPONENTS[activeTab];
-    tabContent = Component ? (
-      <Component
-        business={business}
-        onBusinessUpdated={handleBusinessUpdated}
-        onTabsChanged={() => fetchTabs(activeTab)}
-      />
+    const isKnownTab = activeTab in TAB_COMPONENTS;
+    tabContent = isKnownTab ? (
+      <>
+        {Object.entries(TAB_COMPONENTS).map(([key, Component]) => {
+          if (!mountedTabs.has(key)) return null;
+          return (
+            <div key={key} style={{ display: activeTab === key ? 'block' : 'none' }}>
+              <Component
+                business={business}
+                onBusinessUpdated={handleBusinessUpdated}
+                onTabsChanged={() => fetchTabs(activeTab, activePage)}
+              />
+            </div>
+          );
+        })}
+      </>
     ) : (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-sm font-semibold text-foreground">Coming Soon</p>
