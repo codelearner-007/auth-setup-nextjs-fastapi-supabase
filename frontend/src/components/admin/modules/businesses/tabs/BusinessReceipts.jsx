@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   DndContext,
   closestCenter,
@@ -58,6 +59,7 @@ import {
   createReceipt,
   updateReceipt,
   deleteReceipt,
+  getReceipt,
 } from '@/lib/services/receipts.service';
 import { apiClient } from '@/lib/services/api-client';
 
@@ -341,11 +343,12 @@ function ReceiptForm({ businessId, onSaved, onCancel, onDelete, initial }) {
     setSaving(true);
     try {
       if (isEdit) {
-        await updateReceipt(businessId, initial.id, payload);
+        const updated = await updateReceipt(businessId, initial.id, payload);
+        onSaved(updated);
       } else {
         await createReceipt(businessId, payload);
+        onSaved();
       }
-      onSaved();
     } catch (err) {
       setError(err?.message ?? 'Failed to save receipt.');
     } finally {
@@ -926,120 +929,232 @@ function DeleteDialog({ open, onOpenChange, businessId, receipt, onDeleted }) {
   );
 }
 
-/* ── View receipt dialog ─────────────────────────────────────────────────── */
+/* ── Receipt view (full-page, read-only) ─────────────────────────────────── */
 
-function ViewReceiptDialog({ open, onOpenChange, receipt }) {
-  if (!receipt) return null;
-
-  const total = Array.isArray(receipt.lines) ? sumLines(receipt.lines) : (receipt.total ?? 0);
+function ReceiptViewInfo({ receipt }) {
+  function paidByLabel() {
+    if (receipt.paid_by_type === 'Other') return receipt.paid_by_other || '—';
+    if (receipt.paid_by_name) return receipt.paid_by_name;
+    if (receipt.paid_by_contact_type === 'customer') return 'Customer';
+    if (receipt.paid_by_contact_type === 'supplier') return 'Supplier';
+    return '—';
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Receipt Details</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-            <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Date</p>
-              <p className="font-medium text-foreground">{formatDate(receipt.date)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Reference</p>
-              <p className="font-medium text-foreground">{receipt.reference || '—'}</p>
-            </div>
-            {receipt.supplier_name && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Supplier</p>
-                <p className="font-medium text-foreground">{receipt.supplier_name}</p>
-              </div>
-            )}
-            {receipt.customer_name && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Customer</p>
-                <p className="font-medium text-foreground">{receipt.customer_name}</p>
-              </div>
-            )}
-          </div>
-
-          {receipt.description && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Description</p>
-              <p className="text-foreground whitespace-pre-wrap">{receipt.description}</p>
-            </div>
-          )}
-
-          {Array.isArray(receipt.lines) && receipt.lines.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Line Items</p>
-              <div className="rounded-md border border-border overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-muted/30 border-b border-border">
-                      <th className="px-3 py-1.5 text-left font-semibold text-muted-foreground">Account</th>
-                      <th className="px-3 py-1.5 text-right font-semibold text-muted-foreground w-24">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {receipt.lines.map((line, idx) => (
-                      <tr key={line.id ?? idx}>
-                        <td className="px-3 py-1.5 text-foreground">{line.account_name ?? line.account_id ?? '—'}</td>
-                        <td className="px-3 py-1.5 text-right text-foreground">{parseFloat(line.total || 0).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end border-t border-border pt-3">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Total</span>
-              <span className="text-base font-bold text-foreground">{total.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {receipt.attachment_url && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Attachment</p>
-              <a
-                href={receipt.attachment_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
-              >
-                <Paperclip className="h-3 w-3" />
-                View attachment
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          )}
+    <div className="rounded-lg border border-border overflow-hidden">
+      <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[160px_1fr] items-start border-b border-border">
+        <div className="px-4 py-3 bg-muted/30 border-r border-border">
+          <p className="text-xs font-medium text-muted-foreground">Date</p>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
-            Close
+        <div className="px-4 py-3">
+          <p className="text-sm text-foreground">{formatDate(receipt.date)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[160px_1fr] items-start border-b border-border">
+        <div className="px-4 py-3 bg-muted/30 border-r border-border">
+          <p className="text-xs font-medium text-muted-foreground">Reference</p>
+        </div>
+        <div className="px-4 py-3">
+          <p className="text-sm text-foreground">{receipt.reference || '—'}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[160px_1fr] items-start border-b border-border">
+        <div className="px-4 py-3 bg-muted/30 border-r border-border">
+          <p className="text-xs font-medium text-muted-foreground">Paid By</p>
+        </div>
+        <div className="px-4 py-3">
+          <p className="text-sm text-foreground">{paidByLabel()}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[160px_1fr] items-start border-b border-border">
+        <div className="px-4 py-3 bg-muted/30 border-r border-border">
+          <p className="text-xs font-medium text-muted-foreground">Received In</p>
+        </div>
+        <div className="px-4 py-3">
+          <p className="text-sm text-foreground">{receipt.received_in_account_id || '—'}</p>
+        </div>
+      </div>
+
+      {receipt.description && (
+        <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[160px_1fr] items-start border-b border-border">
+          <div className="px-4 py-3 bg-muted/30 border-r border-border">
+            <p className="text-xs font-medium text-muted-foreground">Description</p>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-sm text-foreground whitespace-pre-wrap">{receipt.description}</p>
+          </div>
+        </div>
+      )}
+
+      {receipt.image_url && (
+        <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[160px_1fr] items-start">
+          <div className="px-4 py-3 bg-muted/30 border-r border-border">
+            <p className="text-xs font-medium text-muted-foreground">Attachment</p>
+          </div>
+          <div className="px-4 py-3">
+            <a
+              href={receipt.image_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              View attachment
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReceiptViewLines({ lines, showLineNumber, showDescription, showQty, showDiscount }) {
+  if (!Array.isArray(lines) || lines.length === 0) return null;
+
+  const grandTotal = sumLines(lines);
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+      <table className="w-full text-sm min-w-[400px]">
+        <thead>
+          <tr className="bg-muted/30 border-b border-border">
+            {showLineNumber && (
+              <th className="px-3 py-2 w-10 text-center text-xs font-semibold text-muted-foreground border-r border-border">#</th>
+            )}
+            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">Account</th>
+            {showDescription && (
+              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">Description</th>
+            )}
+            {showQty && (
+              <th className="px-3 py-2 w-16 text-right text-xs font-semibold text-muted-foreground border-r border-border">Qty</th>
+            )}
+            <th className="px-4 py-2 w-28 text-right text-xs font-semibold text-muted-foreground border-r border-border">Amount</th>
+            {showDiscount && (
+              <th className="px-4 py-2 w-24 text-right text-xs font-semibold text-muted-foreground border-r border-border">Discount</th>
+            )}
+            <th className="px-4 py-2 w-28 text-right text-xs font-semibold text-muted-foreground">Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {lines.map((line, idx) => (
+            <tr key={line.id ?? idx} className="hover:bg-muted/20 transition-colors">
+              {showLineNumber && (
+                <td className="px-3 py-2.5 text-center text-muted-foreground border-r border-border tabular-nums">{idx + 1}</td>
+              )}
+              <td className="px-4 py-2.5 text-foreground border-r border-border">
+                {line.account_name ?? line.account_id ?? '—'}
+              </td>
+              {showDescription && (
+                <td className="px-4 py-2.5 text-muted-foreground border-r border-border">
+                  {line.line_description || '—'}
+                </td>
+              )}
+              {showQty && (
+                <td className="px-3 py-2.5 text-right text-foreground border-r border-border tabular-nums">
+                  {parseFloat(line.qty || 1).toFixed(2)}
+                </td>
+              )}
+              <td className="px-4 py-2.5 text-right text-foreground border-r border-border tabular-nums">
+                {parseFloat(line.amount || 0).toFixed(2)}
+              </td>
+              {showDiscount && (
+                <td className="px-4 py-2.5 text-right text-muted-foreground border-r border-border tabular-nums">
+                  {parseFloat(line.discount || 0).toFixed(2)}
+                </td>
+              )}
+              <td className="px-4 py-2.5 text-right text-foreground tabular-nums font-medium">
+                {parseFloat(line.total || 0).toFixed(2)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-border bg-muted/30">
+            <td
+              colSpan={
+                1 +
+                (showLineNumber ? 1 : 0) +
+                (showDescription ? 1 : 0) +
+                (showQty ? 1 : 0) +
+                (showDiscount ? 1 : 0)
+              }
+              className="border-r border-border"
+            />
+            <td className="px-4 py-2 text-right">
+              <span className="text-sm font-bold text-foreground tabular-nums">{grandTotal.toFixed(2)}</span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function ReceiptView({ receipt, onBack, onEdit }) {
+  if (!receipt) return null;
+
+  return (
+    <div className="space-y-6 pb-8 max-w-2xl">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground"
+            onClick={onBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <h2 className="text-lg font-semibold text-foreground">Receipt</h2>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 cursor-pointer"
+          onClick={onEdit}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+      </div>
+
+      <ReceiptViewInfo receipt={receipt} />
+
+      <ReceiptViewLines
+        lines={receipt.lines}
+        showLineNumber={receipt.show_line_number}
+        showDescription={receipt.show_description}
+        showQty={receipt.show_qty}
+        showDiscount={receipt.show_discount}
+      />
+    </div>
   );
 }
 
 /* ── Main component ──────────────────────────────────────────────────────── */
 
 export default function BusinessReceipts({ business }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const activePage = searchParams.get('page') || null;
+  const activeId = searchParams.get('id') || null;
+
   const [receipts, setReceipts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
-  // 'list' | 'create' | 'edit'
-  const [view, setView] = useState('list');
-  const [editTarget, setEditTarget] = useState(null);
-  const [viewTarget, setViewTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Focused receipt: populated from the list or fetched individually on hard refresh
+  const [focusedReceipt, setFocusedReceipt] = useState(null);
+  const [focusedLoading, setFocusedLoading] = useState(false);
 
   // Column editor
   const [cols, setCols] = useState(DEFAULT_COLS);
@@ -1048,6 +1163,13 @@ export default function BusinessReceipts({ business }) {
 
   const colSensors = useSensors(useSensor(PointerSensor));
 
+  /* ── Navigation helpers ─────────────────────────────────────────────── */
+  const goList   = useCallback(() => router.push('?tab=receipt'), [router]);
+  const goCreate = useCallback(() => router.push('?tab=receipt&page=create'), [router]);
+  const goEdit   = useCallback((id) => router.push(`?tab=receipt&page=edit&id=${id}`), [router]);
+  const goView   = useCallback((id) => router.push(`?tab=receipt&page=view&id=${id}`), [router]);
+
+  /* ── Column editor ──────────────────────────────────────────────────── */
   function openColEditor() {
     setDraftCols(cols);
     setColEditorOpen(true);
@@ -1079,6 +1201,7 @@ export default function BusinessReceipts({ business }) {
     setColEditorOpen(false);
   }
 
+  /* ── Data fetching ──────────────────────────────────────────────────── */
   const fetchReceipts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -1096,11 +1219,28 @@ export default function BusinessReceipts({ business }) {
     fetchReceipts();
   }, [fetchReceipts]);
 
-  function handleSaved() {
-    fetchReceipts();
-    setView('list');
-    setEditTarget(null);
-  }
+  // Resolve the focused receipt from the list or fetch individually on hard refresh
+  useEffect(() => {
+    if ((activePage === 'view' || activePage === 'edit') && activeId) {
+      if (!isLoading) {
+        const found = receipts.find((r) => r.id === activeId) ?? null;
+        if (found) {
+          setFocusedReceipt(found);
+        } else {
+          // Not in list (hard refresh before list loaded, or stale id) — fetch individually
+          let active = true;
+          setFocusedLoading(true);
+          getReceipt(business.id, activeId)
+            .then((data) => { if (active) setFocusedReceipt(data); })
+            .catch(() => { if (active) setFocusedReceipt(null); })
+            .finally(() => { if (active) setFocusedLoading(false); });
+          return () => { active = false; };
+        }
+      }
+    } else {
+      setFocusedReceipt(null);
+    }
+  }, [activePage, activeId, receipts, isLoading, business.id]);
 
   const filtered = search.trim()
     ? receipts.filter((r) => {
@@ -1113,8 +1253,10 @@ export default function BusinessReceipts({ business }) {
       })
     : receipts;
 
-  /* ── Form view ──────────────────────────────────────────────────────── */
-  if (view === 'create' || view === 'edit') {
+  /* ── View page ──────────────────────────────────────────────────────── */
+  if (activePage === 'view') {
+    const receipt = focusedReceipt;
+    if (focusedLoading || !receipt) return <FormSkeleton />;
     return (
       <>
         <DeleteDialog
@@ -1122,17 +1264,51 @@ export default function BusinessReceipts({ business }) {
           onOpenChange={(v) => !v && setDeleteTarget(null)}
           businessId={business.id}
           receipt={deleteTarget}
-          onDeleted={() => { setDeleteTarget(null); setView('list'); setEditTarget(null); fetchReceipts(); }}
+          onDeleted={() => { setDeleteTarget(null); fetchReceipts(); goList(); }}
         />
-        <ReceiptForm
-          key={view === 'create' ? 'create' : editTarget?.id}
-          businessId={business.id}
-          onSaved={handleSaved}
-          onCancel={() => { setView('list'); setEditTarget(null); }}
-          onDelete={view === 'edit' ? () => setDeleteTarget(editTarget) : undefined}
-          initial={view === 'edit' ? editTarget : null}
+        <ReceiptView
+          receipt={receipt}
+          onBack={goList}
+          onEdit={() => goEdit(receipt.id)}
         />
       </>
+    );
+  }
+
+  /* ── Edit page ──────────────────────────────────────────────────────── */
+  if (activePage === 'edit') {
+    const receipt = focusedReceipt;
+    if (focusedLoading || !receipt) return <FormSkeleton />;
+    return (
+      <>
+        <DeleteDialog
+          open={!!deleteTarget}
+          onOpenChange={(v) => !v && setDeleteTarget(null)}
+          businessId={business.id}
+          receipt={deleteTarget}
+          onDeleted={() => { setDeleteTarget(null); fetchReceipts(); goList(); }}
+        />
+        <ReceiptForm
+          key={receipt.id}
+          businessId={business.id}
+          onSaved={(updated) => { fetchReceipts(); goView(updated.id); }}
+          onCancel={() => goView(receipt.id)}
+          onDelete={() => setDeleteTarget(receipt)}
+          initial={receipt}
+        />
+      </>
+    );
+  }
+
+  /* ── Create page ────────────────────────────────────────────────────── */
+  if (activePage === 'create') {
+    return (
+      <ReceiptForm
+        key="create"
+        businessId={business.id}
+        onSaved={() => { fetchReceipts(); goList(); }}
+        onCancel={goList}
+      />
     );
   }
 
@@ -1162,7 +1338,7 @@ export default function BusinessReceipts({ business }) {
           <Button
             size="sm"
             className="gap-1.5 cursor-pointer"
-            onClick={() => setView('create')}
+            onClick={goCreate}
           >
             <Plus className="h-3.5 w-3.5" />
             New Receipt
@@ -1182,13 +1358,11 @@ export default function BusinessReceipts({ business }) {
         <table className="w-full text-sm min-w-[540px]">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              {/* Edit action column — always first */}
               <th className="px-3 py-2 w-16 border-r border-border text-center text-xs font-semibold text-muted-foreground">
                 <span className="flex items-center justify-center">
                   <Pencil className="h-3 w-3" />
                 </span>
               </th>
-              {/* View action column */}
               <th className="px-3 py-2 w-16 border-r border-border text-center text-xs font-semibold text-muted-foreground">
                 <span className="flex items-center justify-center">
                   <Eye className="h-3 w-3" />
@@ -1229,7 +1403,7 @@ export default function BusinessReceipts({ business }) {
                         variant="outline"
                         size="sm"
                         className="h-7 px-2 text-xs cursor-pointer"
-                        onClick={() => { setEditTarget(receipt); setView('edit'); }}
+                        onClick={() => goEdit(receipt.id)}
                       >
                         Edit
                       </Button>
@@ -1239,7 +1413,7 @@ export default function BusinessReceipts({ business }) {
                         variant="outline"
                         size="sm"
                         className="h-7 px-2 text-xs cursor-pointer"
-                        onClick={() => setViewTarget(receipt)}
+                        onClick={() => goView(receipt.id)}
                       >
                         View
                       </Button>
