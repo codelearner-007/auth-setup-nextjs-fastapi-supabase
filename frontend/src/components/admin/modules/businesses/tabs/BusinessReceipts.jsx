@@ -21,6 +21,7 @@ import {
   Trash2,
   AlertTriangle,
   Pencil,
+  Eye,
   Search,
   GripVertical,
   ArrowLeft,
@@ -28,6 +29,8 @@ import {
   Paperclip,
   ExternalLink,
   X,
+  Columns,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -146,9 +149,62 @@ function SortableRow({ id, saving, children }) {
   );
 }
 
+/* ── Column editor defaults ──────────────────────────────────────────────── */
+
+const DEFAULT_COLS = [
+  { key: 'date',        label: 'Date',        visible: true,  locked: true  },
+  { key: 'reference',   label: 'Reference',   visible: true,  locked: false },
+  { key: 'paid_by',     label: 'Paid By',     visible: true,  locked: false },
+  { key: 'received_in', label: 'Received In', visible: false, locked: false },
+  { key: 'description', label: 'Description', visible: false, locked: false },
+  { key: 'attachment',  label: 'Attachment',  visible: false, locked: false },
+  { key: 'amount',      label: 'Amount',      visible: true,  locked: true  },
+];
+
+/* ── Sortable column editor row ──────────────────────────────────────────── */
+
+function SortableColRow({ col, onToggle, isLast }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: col.key });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex items-center gap-3 px-4 py-2.5 select-none transition-colors ${isLast ? '' : 'border-b border-border'} ${isDragging ? 'opacity-50 bg-muted/40' : 'bg-card hover:bg-muted/20'}`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none flex-shrink-0"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <Checkbox
+        id={`col-editor-${col.key}`}
+        checked={col.visible}
+        onCheckedChange={() => !col.locked && onToggle(col.key)}
+        disabled={col.locked}
+        className="h-3.5 w-3.5 flex-shrink-0"
+      />
+      <Label
+        htmlFor={`col-editor-${col.key}`}
+        className={`text-sm flex-1 ${col.locked ? 'text-muted-foreground cursor-not-allowed' : 'text-foreground cursor-pointer'}`}
+      >
+        {col.label}
+      </Label>
+      {col.locked && (
+        <Lock className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+      )}
+    </div>
+  );
+}
+
 /* ── Receipt form (create / edit) ────────────────────────────────────────── */
 
-function ReceiptForm({ businessId, onSaved, onCancel, initial }) {
+function ReceiptForm({ businessId, onSaved, onCancel, onDelete, initial }) {
   const isEdit = !!initial;
 
   // Core fields
@@ -774,28 +830,44 @@ function ReceiptForm({ businessId, onSaved, onCancel, initial }) {
       <Separator />
 
       {/* ── Action buttons ───────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          className="cursor-pointer min-w-[90px]"
-          onClick={handleSubmit}
-          disabled={saving}
-        >
-          {saving ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : isEdit ? (
-            'Save'
-          ) : (
-            'Create'
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button
+            className="cursor-pointer min-w-[90px]"
+            onClick={handleSubmit}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : isEdit ? (
+              'Update'
+            ) : (
+              'Create'
+            )}
+          </Button>
+          {!isEdit && (
+            <Button
+              variant="ghost"
+              className="cursor-pointer text-muted-foreground"
+              onClick={onCancel}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
           )}
-        </Button>
-        <Button
-          variant="ghost"
-          className="cursor-pointer text-muted-foreground"
-          onClick={onCancel}
-          disabled={saving}
-        >
-          Cancel
-        </Button>
+        </div>
+        {isEdit && onDelete && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="cursor-pointer gap-1.5"
+            onClick={onDelete}
+            disabled={saving}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -854,6 +926,107 @@ function DeleteDialog({ open, onOpenChange, businessId, receipt, onDeleted }) {
   );
 }
 
+/* ── View receipt dialog ─────────────────────────────────────────────────── */
+
+function ViewReceiptDialog({ open, onOpenChange, receipt }) {
+  if (!receipt) return null;
+
+  const total = Array.isArray(receipt.lines) ? sumLines(receipt.lines) : (receipt.total ?? 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Receipt Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Date</p>
+              <p className="font-medium text-foreground">{formatDate(receipt.date)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Reference</p>
+              <p className="font-medium text-foreground">{receipt.reference || '—'}</p>
+            </div>
+            {receipt.supplier_name && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Supplier</p>
+                <p className="font-medium text-foreground">{receipt.supplier_name}</p>
+              </div>
+            )}
+            {receipt.customer_name && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Customer</p>
+                <p className="font-medium text-foreground">{receipt.customer_name}</p>
+              </div>
+            )}
+          </div>
+
+          {receipt.description && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Description</p>
+              <p className="text-foreground whitespace-pre-wrap">{receipt.description}</p>
+            </div>
+          )}
+
+          {Array.isArray(receipt.lines) && receipt.lines.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Line Items</p>
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/30 border-b border-border">
+                      <th className="px-3 py-1.5 text-left font-semibold text-muted-foreground">Account</th>
+                      <th className="px-3 py-1.5 text-right font-semibold text-muted-foreground w-24">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {receipt.lines.map((line, idx) => (
+                      <tr key={line.id ?? idx}>
+                        <td className="px-3 py-1.5 text-foreground">{line.account_name ?? line.account_id ?? '—'}</td>
+                        <td className="px-3 py-1.5 text-right text-foreground">{parseFloat(line.total || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end border-t border-border pt-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Total</span>
+              <span className="text-base font-bold text-foreground">{total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {receipt.attachment_url && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Attachment</p>
+              <a
+                href={receipt.attachment_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Paperclip className="h-3 w-3" />
+                View attachment
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ── Main component ──────────────────────────────────────────────────────── */
 
 export default function BusinessReceipts({ business }) {
@@ -865,7 +1038,46 @@ export default function BusinessReceipts({ business }) {
   // 'list' | 'create' | 'edit'
   const [view, setView] = useState('list');
   const [editTarget, setEditTarget] = useState(null);
+  const [viewTarget, setViewTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Column editor
+  const [cols, setCols] = useState(DEFAULT_COLS);
+  const [draftCols, setDraftCols] = useState(DEFAULT_COLS);
+  const [colEditorOpen, setColEditorOpen] = useState(false);
+
+  const colSensors = useSensors(useSensor(PointerSensor));
+
+  function openColEditor() {
+    setDraftCols(cols);
+    setColEditorOpen(true);
+  }
+
+  function handleColDragEnd(event) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setDraftCols((prev) => {
+        const oldIndex = prev.findIndex((c) => c.key === active.id);
+        const newIndex = prev.findIndex((c) => c.key === over.id);
+        return arrayMove(prev, oldIndex, newIndex);
+      });
+    }
+  }
+
+  function toggleDraftCol(key) {
+    setDraftCols((prev) =>
+      prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c))
+    );
+  }
+
+  function applyColEditor() {
+    setCols(draftCols);
+    setColEditorOpen(false);
+  }
+
+  function cancelColEditor() {
+    setColEditorOpen(false);
+  }
 
   const fetchReceipts = useCallback(async () => {
     setIsLoading(true);
@@ -904,13 +1116,23 @@ export default function BusinessReceipts({ business }) {
   /* ── Form view ──────────────────────────────────────────────────────── */
   if (view === 'create' || view === 'edit') {
     return (
-      <ReceiptForm
-        key={view === 'create' ? 'create' : editTarget?.id}
-        businessId={business.id}
-        onSaved={handleSaved}
-        onCancel={() => { setView('list'); setEditTarget(null); }}
-        initial={view === 'edit' ? editTarget : null}
-      />
+      <>
+        <DeleteDialog
+          open={!!deleteTarget}
+          onOpenChange={(v) => !v && setDeleteTarget(null)}
+          businessId={business.id}
+          receipt={deleteTarget}
+          onDeleted={() => { setDeleteTarget(null); setView('list'); setEditTarget(null); fetchReceipts(); }}
+        />
+        <ReceiptForm
+          key={view === 'create' ? 'create' : editTarget?.id}
+          businessId={business.id}
+          onSaved={handleSaved}
+          onCancel={() => { setView('list'); setEditTarget(null); }}
+          onDelete={view === 'edit' ? () => setDeleteTarget(editTarget) : undefined}
+          initial={view === 'edit' ? editTarget : null}
+        />
+      </>
     );
   }
 
@@ -919,15 +1141,6 @@ export default function BusinessReceipts({ business }) {
 
   return (
     <div className="space-y-4">
-      {/* Delete dialog */}
-      <DeleteDialog
-        open={!!deleteTarget}
-        onOpenChange={(v) => !v && setDeleteTarget(null)}
-        businessId={business.id}
-        receipt={deleteTarget}
-        onDeleted={fetchReceipts}
-      />
-
       {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -969,34 +1182,35 @@ export default function BusinessReceipts({ business }) {
         <table className="w-full text-sm min-w-[540px]">
           <thead>
             <tr className="border-b border-border bg-muted/30">
+              {/* Edit action column — always first */}
               <th className="px-3 py-2 w-16 border-r border-border text-center text-xs font-semibold text-muted-foreground">
                 <span className="flex items-center justify-center">
                   <Pencil className="h-3 w-3" />
                 </span>
               </th>
-              <th className="px-4 py-2 w-28 text-left text-xs font-semibold text-muted-foreground border-r border-border">
-                Date
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">
-                Reference
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">
-                Paid By
-              </th>
-              <th className="px-4 py-2 w-28 text-right text-xs font-semibold text-muted-foreground border-r border-border">
-                Amount
-              </th>
-              <th className="px-3 py-2 w-16 text-center text-xs font-semibold text-muted-foreground">
+              {/* View action column */}
+              <th className="px-3 py-2 w-16 border-r border-border text-center text-xs font-semibold text-muted-foreground">
                 <span className="flex items-center justify-center">
-                  <Trash2 className="h-3 w-3" />
+                  <Eye className="h-3 w-3" />
                 </span>
               </th>
+              {cols.filter((c) => c.visible).map((col) => (
+                <th
+                  key={col.key}
+                  className={`px-4 py-2 text-xs font-semibold text-muted-foreground border-r border-border ${col.key === 'amount' ? 'w-28 text-right' : 'text-left'}`}
+                >
+                  {col.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={2 + cols.filter((c) => c.visible).length}
+                  className="px-4 py-12 text-center text-sm text-muted-foreground"
+                >
                   {search.trim() ? 'No receipts match your search.' : 'No receipts yet'}
                 </td>
               </tr>
@@ -1020,35 +1234,140 @@ export default function BusinessReceipts({ business }) {
                         Edit
                       </Button>
                     </td>
-                    <td className="px-4 py-2.5 text-foreground border-r border-border whitespace-nowrap">
-                      {formatDate(receipt.date)}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
-                      {receipt.reference || '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
-                      {receipt.paid_by_other || (receipt.paid_by_contact_id ? 'Contact' : '—')}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-foreground tabular-nums border-r border-border whitespace-nowrap">
-                      {total.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-2 w-16 text-center">
+                    <td className="px-3 py-2 w-16 border-r border-border text-center">
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 cursor-pointer text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteTarget(receipt)}
-                        aria-label="Delete receipt"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs cursor-pointer"
+                        onClick={() => setViewTarget(receipt)}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        View
                       </Button>
                     </td>
+                    {cols.filter((c) => c.visible).map((col) => {
+                      if (col.key === 'date') {
+                        return (
+                          <td key="date" className="px-4 py-2.5 text-foreground border-r border-border whitespace-nowrap">
+                            {formatDate(receipt.date)}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'reference') {
+                        return (
+                          <td key="reference" className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
+                            {receipt.reference || '—'}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'paid_by') {
+                        return (
+                          <td key="paid_by" className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
+                            {receipt.paid_by_other || (receipt.paid_by_contact_id ? 'Contact' : '—')}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'received_in') {
+                        return (
+                          <td key="received_in" className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
+                            {receipt.received_in_account_id || '—'}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'description') {
+                        return (
+                          <td key="description" className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
+                            {receipt.description || '—'}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'attachment') {
+                        return (
+                          <td key="attachment" className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
+                            {receipt.image_url ? (
+                              <a href={receipt.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-2">
+                                View
+                              </a>
+                            ) : '—'}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'amount') {
+                        return (
+                          <td key="amount" className="px-4 py-2.5 text-right text-foreground tabular-nums border-r border-border whitespace-nowrap">
+                            {total.toFixed(2)}
+                          </td>
+                        );
+                      }
+                      return null;
+                    })}
                   </tr>
                 );
               })
             )}
           </tbody>
+          {filtered.length > 0 && cols.some((c) => c.visible && c.key === 'amount') && (
+            <tfoot>
+              <tr className="border-t border-border bg-muted/30">
+                <td
+                  colSpan={2 + cols.filter((c) => c.visible && c.key !== 'amount').length}
+                  className="border-r border-border"
+                />
+                <td className="px-4 py-2 text-right border-r border-border">
+                  <div className="text-sm font-semibold text-muted-foreground tabular-nums">
+                    {filtered.reduce((acc, r) => {
+                      const t = Array.isArray(r.lines) ? sumLines(r.lines) : (r.total ?? 0);
+                      return acc + t;
+                    }, 0).toFixed(2)}
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
+
+        {/* Footer bar + inline column editor */}
+        <div className="border-t border-border">
+          <div className="bg-muted/20 px-4 py-2 flex items-center justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground h-7"
+              onClick={openColEditor}
+            >
+              <Columns className="h-3.5 w-3.5" />
+              Edit columns
+            </Button>
+          </div>
+
+          {colEditorOpen && (
+            <div className="border-t border-border">
+              <div className="px-4 py-2.5 bg-muted/30 border-b border-border flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Columns</span>
+                <span className="text-xs text-muted-foreground">Drag to reorder</span>
+              </div>
+              <DndContext sensors={colSensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
+                <SortableContext items={draftCols.map((c) => c.key)} strategy={verticalListSortingStrategy}>
+                  {draftCols.map((col, idx) => (
+                    <SortableColRow
+                      key={col.key}
+                      col={col}
+                      onToggle={toggleDraftCol}
+                      isLast={idx === draftCols.length - 1}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+              <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center gap-2">
+                <Button size="sm" className="cursor-pointer h-7 text-xs" onClick={applyColEditor}>
+                  Update
+                </Button>
+                <Button variant="ghost" size="sm" className="cursor-pointer h-7 text-xs text-muted-foreground" onClick={cancelColEditor}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
