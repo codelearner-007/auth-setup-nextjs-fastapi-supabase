@@ -23,6 +23,8 @@ from app.schemas.response.tab import (
     BusinessTabResponse,
 )
 from app.schemas.response.user import UserStatsResponse, UserWithRolesResponse
+from app.schemas.response.tab_columns import TabColumnItem as TabColumnItemResponse
+from app.schemas.response.tab_columns import TabColumnsResponse
 from app.schemas.response.user_role import UserRoleResponse
 
 __all__ = [
@@ -44,6 +46,8 @@ __all__ = [
     "ProfileResponse",
     "RoleResponse",
     "RoleWithPermissionsResponse",
+    "TabColumnItemResponse",
+    "TabColumnsResponse",
     "UserRoleResponse",
     "UserStatsResponse",
     "UserWithRolesResponse",

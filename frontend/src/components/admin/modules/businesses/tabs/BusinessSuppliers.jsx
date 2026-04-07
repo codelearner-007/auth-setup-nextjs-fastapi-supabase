@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Loader2, Trash2, AlertTriangle, Pencil, Eye, Search } from 'lucide-react';
+import { Plus, Loader2, Trash2, AlertTriangle, Pencil, Eye, Search, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,14 @@ import {
   deleteSupplier,
   listSupplierReceipts,
 } from '@/lib/services/suppliers.service';
+import { getTabColumns, updateTabColumns } from '@/lib/services/business.service';
+import ColEditorDialog from '../ColEditorDialog';
+
+const DEFAULT_COLS = [
+  { key: 'name',  label: 'Name',  visible: true,  locked: true  },
+  { key: 'code',  label: 'Code',  visible: true,  locked: false },
+  { key: 'email', label: 'Email', visible: true,  locked: false },
+];
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -511,11 +519,31 @@ export default function BusinessSuppliers({ business }) {
   const [editTarget, setEditTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
 
+  const [cols, setCols] = useState(DEFAULT_COLS);
+  const [colEditorOpen, setColEditorOpen] = useState(false);
+
   const fetchSuppliers = useCallback(async () => {
     setError(null);
     try {
-      const data = await listSuppliers(business.id);
+      const [data, colRes] = await Promise.all([
+        listSuppliers(business.id),
+        getTabColumns(business.id, 'suppliers').catch(() => null),
+      ]);
       setSuppliers(Array.isArray(data) ? data : (data?.items ?? []));
+      const saved = colRes?.columns;
+      if (Array.isArray(saved) && saved.length > 0) {
+        const sorted = [...saved].sort((a, b) => a.order_index - b.order_index);
+        const merged = sorted
+          .map(({ col_key, visible }) => {
+            const def = DEFAULT_COLS.find((d) => d.key === col_key);
+            if (!def) return null;
+            return { ...def, visible: def.locked ? true : visible };
+          })
+          .filter(Boolean);
+        const savedKeys = new Set(saved.map((s) => s.col_key));
+        const newCols = DEFAULT_COLS.filter((d) => !savedKeys.has(d.key));
+        setCols([...merged, ...newCols]);
+      }
     } catch (err) {
       setError(err?.message ?? 'Failed to load suppliers.');
     } finally {
@@ -614,15 +642,17 @@ export default function BusinessSuppliers({ business }) {
                   <Eye className="h-3 w-3" />
                 </span>
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">Name</th>
-              <th className="px-4 py-2 w-28 text-left text-xs font-semibold text-muted-foreground border-r border-border">Code</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Email</th>
+              {cols.filter((c) => c.visible).map((col) => (
+                <th key={col.key} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">
+                  {col.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={2 + cols.filter((c) => c.visible).length} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   {search.trim() ? 'No suppliers match your search.' : 'No suppliers yet'}
                 </td>
               </tr>
@@ -649,20 +679,54 @@ export default function BusinessSuppliers({ business }) {
                       View
                     </Button>
                   </td>
-                  <td className="px-4 py-2.5 text-foreground border-r border-border whitespace-nowrap">
-                    {supplier.name}
-                  </td>
-                  <td className="px-4 py-2.5 w-28 text-muted-foreground border-r border-border whitespace-nowrap">
-                    {supplier.code || '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
-                    {supplier.email || '—'}
-                  </td>
+                  {cols.filter((c) => c.visible).map((col) => {
+                    if (col.key === 'name') return (
+                      <td key="name" className="px-4 py-2.5 text-foreground border-r border-border whitespace-nowrap">
+                        {supplier.name}
+                      </td>
+                    );
+                    if (col.key === 'code') return (
+                      <td key="code" className="px-4 py-2.5 text-muted-foreground border-r border-border whitespace-nowrap">
+                        {supplier.code || '—'}
+                      </td>
+                    );
+                    if (col.key === 'email') return (
+                      <td key="email" className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                        {supplier.email || '—'}
+                      </td>
+                    );
+                    return null;
+                  })}
                 </tr>
               ))
             )}
           </tbody>
         </table>
+
+        {/* Footer bar */}
+        <div className="border-t border-border bg-muted/20 px-4 py-2 flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground h-7"
+            onClick={() => setColEditorOpen(true)}
+          >
+            <Columns className="h-3.5 w-3.5" />
+            Edit columns
+          </Button>
+        </div>
+
+        <ColEditorDialog
+          open={colEditorOpen}
+          onOpenChange={setColEditorOpen}
+          cols={cols}
+          onApply={(newCols) => {
+            setCols(newCols);
+            const columns = newCols.map((c, i) => ({ col_key: c.key, visible: c.visible, order_index: i }));
+            updateTabColumns(business.id, 'suppliers', columns)
+              .catch((err) => console.error('Failed to save column preferences:', err?.message ?? err));
+          }}
+        />
       </div>
     </div>
   );

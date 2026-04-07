@@ -55,3 +55,11 @@ export async function updateBusiness(id, data) {
 export async function resetBusiness(id) {
   return apiClient.post(`/v1/businesses/${id}/reset`, {});
 }
+
+export async function getTabColumns(businessId, tabKey) {
+  return apiClient.get(`/v1/businesses/${businessId}/tab-columns/${tabKey}`);
+}
+
+export async function updateTabColumns(businessId, tabKey, columns) {
+  return apiClient.put(`/v1/businesses/${businessId}/tab-columns/${tabKey}`, { columns });
+}

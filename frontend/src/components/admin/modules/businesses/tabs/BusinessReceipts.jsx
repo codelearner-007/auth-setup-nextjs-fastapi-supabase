@@ -31,7 +31,6 @@ import {
   ExternalLink,
   X,
   Columns,
-  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +53,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import ColEditorDialog from '../ColEditorDialog';
 import {
   listReceipts,
   createReceipt,
@@ -62,6 +62,7 @@ import {
   getReceipt,
 } from '@/lib/services/receipts.service';
 import { apiClient } from '@/lib/services/api-client';
+import { getTabColumns, updateTabColumns } from '@/lib/services/business.service';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
@@ -164,47 +165,6 @@ const DEFAULT_COLS = [
   { key: 'discount',    label: 'Discount',    visible: false, locked: false },
   { key: 'amount',      label: 'Amount',      visible: true,  locked: true  },
 ];
-
-/* ── Sortable column editor row ──────────────────────────────────────────── */
-
-function SortableColRow({ col, onToggle, isLast }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: col.key });
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-center gap-3 px-4 py-2.5 select-none transition-colors ${isLast ? '' : 'border-b border-border'} ${isDragging ? 'opacity-50 bg-muted/40' : 'bg-card hover:bg-muted/20'}`}
-    >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none flex-shrink-0"
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
-      <Checkbox
-        id={`col-editor-${col.key}`}
-        checked={col.visible}
-        onCheckedChange={() => !col.locked && onToggle(col.key)}
-        disabled={col.locked}
-        className="h-3.5 w-3.5 flex-shrink-0"
-      />
-      <Label
-        htmlFor={`col-editor-${col.key}`}
-        className={`text-sm flex-1 ${col.locked ? 'text-muted-foreground cursor-not-allowed' : 'text-foreground cursor-pointer'}`}
-      >
-        {col.label}
-      </Label>
-      {col.locked && (
-        <Lock className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
-      )}
-    </div>
-  );
-}
 
 /* ── Receipt form (create / edit) ────────────────────────────────────────── */
 
@@ -1132,12 +1092,9 @@ export default function BusinessReceipts({ business }) {
   const [focusedReceipt, setFocusedReceipt] = useState(null);
   const [focusedLoading, setFocusedLoading] = useState(false);
 
-  // Column editor
+  // Column editor — persisted in DB via ui-preferences API
   const [cols, setCols] = useState(DEFAULT_COLS);
-  const [draftCols, setDraftCols] = useState(DEFAULT_COLS);
   const [colEditorOpen, setColEditorOpen] = useState(false);
-
-  const colSensors = useSensors(useSensor(PointerSensor));
 
   // Cached form data shared across all ReceiptForm instances — fetched once
   const [formData, setFormData] = useState({
@@ -1183,34 +1140,7 @@ export default function BusinessReceipts({ business }) {
 
   /* ── Column editor ──────────────────────────────────────────────────── */
   function openColEditor() {
-    setDraftCols(cols);
     setColEditorOpen(true);
-  }
-
-  function handleColDragEnd(event) {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setDraftCols((prev) => {
-        const oldIndex = prev.findIndex((c) => c.key === active.id);
-        const newIndex = prev.findIndex((c) => c.key === over.id);
-        return arrayMove(prev, oldIndex, newIndex);
-      });
-    }
-  }
-
-  function toggleDraftCol(key) {
-    setDraftCols((prev) =>
-      prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c))
-    );
-  }
-
-  function applyColEditor() {
-    setCols(draftCols);
-    setColEditorOpen(false);
-  }
-
-  function cancelColEditor() {
-    setColEditorOpen(false);
   }
 
   /* ── Data fetching ──────────────────────────────────────────────────── */
@@ -1218,8 +1148,25 @@ export default function BusinessReceipts({ business }) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await listReceipts(business.id);
+      const [data, colRes] = await Promise.all([
+        listReceipts(business.id),
+        getTabColumns(business.id, 'receipt').catch(() => null),
+      ]);
       setReceipts(Array.isArray(data) ? data : (data?.items ?? []));
+      const saved = colRes?.columns;
+      if (Array.isArray(saved) && saved.length > 0) {
+        const sorted = [...saved].sort((a, b) => a.order_index - b.order_index);
+        const merged = sorted
+          .map(({ col_key, visible }) => {
+            const def = DEFAULT_COLS.find((d) => d.key === col_key);
+            if (!def) return null;
+            return { ...def, visible: def.locked ? true : visible };
+          })
+          .filter(Boolean);
+        const savedKeys = new Set(saved.map((s) => s.col_key));
+        const newCols = DEFAULT_COLS.filter((d) => !savedKeys.has(d.key));
+        setCols([...merged, ...newCols]);
+      }
     } catch (err) {
       setError(err?.message ?? 'Failed to load receipts.');
     } finally {
@@ -1391,7 +1338,7 @@ export default function BusinessReceipts({ business }) {
               {cols.filter((c) => c.visible).map((col) => (
                 <th
                   key={col.key}
-                  className={`px-4 py-2 text-xs font-semibold text-muted-foreground border-r border-border ${col.key === 'amount' ? 'w-28 text-right' : 'text-left'}`}
+                  className={`px-4 py-2 text-xs font-semibold text-muted-foreground border-r border-border ${'amount qty discount'.includes(col.key) ? 'w-28 text-right' : 'text-left'}`}
                 >
                   {col.label}
                 </th>
@@ -1485,6 +1432,26 @@ export default function BusinessReceipts({ business }) {
                           </td>
                         );
                       }
+                      if (col.key === 'qty') {
+                        const totalQty = Array.isArray(receipt.lines)
+                          ? receipt.lines.reduce((acc, l) => acc + (parseFloat(l.qty) || 0), 0)
+                          : 0;
+                        return (
+                          <td key="qty" className="px-4 py-2.5 text-right text-muted-foreground tabular-nums border-r border-border whitespace-nowrap">
+                            {totalQty > 0 ? totalQty.toFixed(2) : '—'}
+                          </td>
+                        );
+                      }
+                      if (col.key === 'discount') {
+                        const totalDiscount = Array.isArray(receipt.lines)
+                          ? receipt.lines.reduce((acc, l) => acc + (parseFloat(l.discount) || 0), 0)
+                          : 0;
+                        return (
+                          <td key="discount" className="px-4 py-2.5 text-right text-muted-foreground tabular-nums border-r border-border whitespace-nowrap">
+                            {totalDiscount > 0 ? totalDiscount.toFixed(2) : '—'}
+                          </td>
+                        );
+                      }
                       if (col.key === 'amount') {
                         return (
                           <td key="amount" className="px-4 py-2.5 text-right text-foreground tabular-nums border-r border-border whitespace-nowrap">
@@ -1533,33 +1500,17 @@ export default function BusinessReceipts({ business }) {
         </div>
 
         {/* Column editor dialog */}
-        <Dialog open={colEditorOpen} onOpenChange={(v) => { if (!v) cancelColEditor(); }}>
-          <DialogContent className="w-64 p-0 gap-0 overflow-hidden">
-            <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30">
-              <DialogTitle className="text-sm font-semibold">Edit Columns</DialogTitle>
-            </DialogHeader>
-            <DndContext sensors={colSensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
-              <SortableContext items={draftCols.map((c) => c.key)} strategy={verticalListSortingStrategy}>
-                {draftCols.map((col, idx) => (
-                  <SortableColRow
-                    key={col.key}
-                    col={col}
-                    onToggle={toggleDraftCol}
-                    isLast={idx === draftCols.length - 1}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
-            <DialogFooter className="px-4 py-3 border-t border-border bg-muted/20 flex-row gap-2 sm:justify-start">
-              <Button size="sm" className="cursor-pointer h-7 text-xs" onClick={applyColEditor}>
-                Apply
-              </Button>
-              <Button variant="ghost" size="sm" className="cursor-pointer h-7 text-xs text-muted-foreground" onClick={cancelColEditor}>
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ColEditorDialog
+          open={colEditorOpen}
+          onOpenChange={setColEditorOpen}
+          cols={cols}
+          onApply={(newCols) => {
+            setCols(newCols);
+            const columns = newCols.map((c, i) => ({ col_key: c.key, visible: c.visible, order_index: i }));
+            updateTabColumns(business.id, 'receipt', columns)
+              .catch((err) => console.error('Failed to save column preferences:', err?.message ?? err));
+          }}
+        />
       </div>
     </div>
   );

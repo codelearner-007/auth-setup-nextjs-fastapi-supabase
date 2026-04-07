@@ -76,6 +76,13 @@
 - **Problem**: RLS enabled but no INSERT policy means even service_role needs bypass or policy
 - **Solution**: Two INSERT policies - one for `service_role` (unrestricted), one for `authenticated` (own user_id only)
 
+### Business Tab Columns Table (migration 20260407000018; replaces 000017)
+- `business_ui_preferences` DROPPED in 000018 (was a JSONB blob — 1NF violation)
+- `business_tab_columns` - business_id (FK businesses CASCADE), tab_key TEXT, col_key TEXT, visible BOOLEAN DEFAULT true, order_index INTEGER DEFAULT 0; UNIQUE(business_id, tab_key, col_key); RLS + service_role_all + GRANT ALL to service_role
+- No updated_at or created_at — insert/upsert only table
+- Indexes: idx_business_tab_columns_lookup ON (business_id, tab_key)
+- Pattern: upsert on (business_id, tab_key, col_key) to toggle visibility or reorder
+
 ### Receipts Table (migration 20260407000012; tab added in 000013)
 - `receipts` - business_id (FK businesses CASCADE), date DATE, reference TEXT, paid_by_type TEXT ('Contact'|'Other'), paid_by_contact_id UUID, paid_by_contact_type TEXT ('customer'|'supplier'), paid_by_other TEXT, received_in_account_id UUID (FK bank_accounts SET NULL), description TEXT, lines JSONB (array of {account_id, amount, total}), show_* BOOLEAN flags, image_url TEXT; RLS + service_role_all + GRANT ALL to service_role
 - Indexes: idx on business_id, date, paid_by_contact_id, paid_by_contact_type, received_in_account_id
@@ -91,7 +98,7 @@
 - No access granted to anon or authenticated — FastAPI backend (service_role) proxies all file I/O
 
 ## File Locations
-- Migrations: `supabase/migrations/` (21 files through 20260407000015: uuid_v7, rbac_system, jwt_claims_hook, business_system, businesses_soft_delete, fix_audit_logs_rls, drop_business_details_redundant_columns, coa_accounts_type_is_total, backfill_coa_fixed, add_chart_of_accounts_tab, bank_accounts (+ 000004/000005 drop patches), customers, add_customers_tab, suppliers, add_suppliers_tab, add_history_tab, remove_history_tab, receipts, add_receipts_tab, suspense_materialized_view, receipt_attachments_bucket)
+- Migrations: `supabase/migrations/` (24 files through 20260407000018: uuid_v7, rbac_system, jwt_claims_hook, business_system, businesses_soft_delete, fix_audit_logs_rls, drop_business_details_redundant_columns, coa_accounts_type_is_total, backfill_coa_fixed, add_chart_of_accounts_tab, bank_accounts (+ 000004/000005 drop patches), customers, add_customers_tab, suppliers, add_suppliers_tab, add_history_tab, remove_history_tab, receipts, add_receipts_tab, suspense_materialized_view, receipt_attachments_bucket, receipts_composite_index, business_ui_preferences, business_tab_columns)
 - Seeds: `supabase/seeds/rbac_seed.sql`
 - Backend models: `backend/app/models/`
 - Backend schemas: `backend/app/schemas/`

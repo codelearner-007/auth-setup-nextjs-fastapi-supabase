@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Loader2, Trash2, AlertTriangle, Pencil, Eye, Search } from 'lucide-react';
+import { Plus, Loader2, Trash2, AlertTriangle, Pencil, Eye, Search, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,13 @@ import {
   updateBankAccount,
   deleteBankAccount,
 } from '@/lib/services/bank-accounts.service';
+import { getTabColumns, updateTabColumns } from '@/lib/services/business.service';
+import ColEditorDialog from '../ColEditorDialog';
+
+const DEFAULT_COLS = [
+  { key: 'name',           label: 'Name',           visible: true, locked: true  },
+  { key: 'actual_balance', label: 'Actual balance', visible: true, locked: false },
+];
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -368,13 +375,33 @@ export default function BusinessBankAndCashAccounts({ business }) {
   const [editTarget, setEditTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
 
+  const [cols, setCols] = useState(DEFAULT_COLS);
+  const [colEditorOpen, setColEditorOpen] = useState(false);
+
   const fetchAccounts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await listBankAccounts(business.id);
+      const [data, colRes] = await Promise.all([
+        listBankAccounts(business.id),
+        getTabColumns(business.id, 'bank-and-cash-accounts').catch(() => null),
+      ]);
       setAccounts(Array.isArray(data) ? data : (data?.items ?? []));
       setCoaTotal(data?.coa_total ?? 0);
+      const saved = colRes?.columns;
+      if (Array.isArray(saved) && saved.length > 0) {
+        const sorted = [...saved].sort((a, b) => a.order_index - b.order_index);
+        const merged = sorted
+          .map(({ col_key, visible }) => {
+            const def = DEFAULT_COLS.find((d) => d.key === col_key);
+            if (!def) return null;
+            return { ...def, visible: def.locked ? true : visible };
+          })
+          .filter(Boolean);
+        const savedKeys = new Set(saved.map((s) => s.col_key));
+        const newCols = DEFAULT_COLS.filter((d) => !savedKeys.has(d.key));
+        setCols([...merged, ...newCols]);
+      }
     } catch (err) {
       setError(err?.message ?? 'Failed to load accounts.');
     } finally {
@@ -471,14 +498,20 @@ export default function BusinessBankAndCashAccounts({ business }) {
                   <Eye className="h-3 w-3" />
                 </span>
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground border-r border-border">Name</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Actual balance</th>
+              {cols.filter((c) => c.visible).map((col) => (
+                <th
+                  key={col.key}
+                  className={`px-4 py-2 text-xs font-semibold text-muted-foreground border-r border-border ${col.key === 'actual_balance' ? 'text-right' : 'text-left'}`}
+                >
+                  {col.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={2 + cols.filter((c) => c.visible).length} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   {search.trim() ? 'No accounts match your search.' : 'Empty'}
                 </td>
               </tr>
@@ -505,20 +538,27 @@ export default function BusinessBankAndCashAccounts({ business }) {
                       View
                     </Button>
                   </td>
-                  <td className="px-4 py-2.5 text-foreground border-r border-border">
-                    {account.name}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-primary font-medium tabular-nums">
-                    {formatBalance(account.current_balance)}
-                  </td>
+                  {cols.filter((c) => c.visible).map((col) => {
+                    if (col.key === 'name') return (
+                      <td key="name" className="px-4 py-2.5 text-foreground border-r border-border">
+                        {account.name}
+                      </td>
+                    );
+                    if (col.key === 'actual_balance') return (
+                      <td key="actual_balance" className="px-4 py-2.5 text-right text-primary font-medium tabular-nums">
+                        {formatBalance(account.current_balance)}
+                      </td>
+                    );
+                    return null;
+                  })}
                 </tr>
               ))
             )}
           </tbody>
-          {accounts.length > 0 && (
+          {accounts.length > 0 && cols.some((c) => c.visible && c.key === 'actual_balance') && (
             <tfoot>
               <tr className="border-t border-border bg-muted/20">
-                <td colSpan={3} className="border-r border-border" />
+                <td colSpan={2 + cols.filter((c) => c.visible && c.key !== 'actual_balance').length} className="border-r border-border" />
                 <td className="px-4 py-2.5 text-right text-sm font-semibold text-foreground tabular-nums">
                   {formatBalance(coaTotal)}
                 </td>
@@ -526,6 +566,31 @@ export default function BusinessBankAndCashAccounts({ business }) {
             </tfoot>
           )}
         </table>
+
+        {/* Footer bar */}
+        <div className="border-t border-border bg-muted/20 px-4 py-2 flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground h-7"
+            onClick={() => setColEditorOpen(true)}
+          >
+            <Columns className="h-3.5 w-3.5" />
+            Edit columns
+          </Button>
+        </div>
+
+        <ColEditorDialog
+          open={colEditorOpen}
+          onOpenChange={setColEditorOpen}
+          cols={cols}
+          onApply={(newCols) => {
+            setCols(newCols);
+            const columns = newCols.map((c, i) => ({ col_key: c.key, visible: c.visible, order_index: i }));
+            updateTabColumns(business.id, 'bank-and-cash-accounts', columns)
+              .catch((err) => console.error('Failed to save column preferences:', err?.message ?? err));
+          }}
+        />
       </div>
     </div>
   );

@@ -22,6 +22,8 @@ from app.schemas.request.tab import (
     UpsertAdminTabsRequest,
     UpsertBusinessTabsRequest,
 )
+from app.schemas.request.tab_columns import TabColumnItem as TabColumnItemRequest
+from app.schemas.request.tab_columns import TabColumnsUpdate
 from app.schemas.request.user_role import AssignUserRoleRequest
 
 __all__ = [
@@ -40,6 +42,8 @@ __all__ = [
     "UpdateProfileRequest",
     "UpdateRolePermissionsRequest",
     "UpdateRoleRequest",
+    "TabColumnItemRequest",
+    "TabColumnsUpdate",
     "UpsertAdminTabsRequest",
     "UpsertBusinessTabsRequest",
 ]
