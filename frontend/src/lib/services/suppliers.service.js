@@ -21,3 +21,7 @@ export async function updateSupplier(businessId, supplierId, data) {
 export async function deleteSupplier(businessId, supplierId) {
   return apiClient.delete(`${base(businessId)}/${supplierId}`);
 }
+
+export async function listSupplierReceipts(businessId, supplierId) {
+  return apiClient.get(`/v1/businesses/${businessId}/suppliers/${supplierId}/receipts`);
+}

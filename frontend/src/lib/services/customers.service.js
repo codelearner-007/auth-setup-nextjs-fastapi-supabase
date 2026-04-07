@@ -21,3 +21,7 @@ export async function updateCustomer(businessId, customerId, data) {
 export async function deleteCustomer(businessId, customerId) {
   return apiClient.delete(`${base(businessId)}/${customerId}`);
 }
+
+export async function listCustomerReceipts(businessId, customerId) {
+  return apiClient.get(`/v1/businesses/${businessId}/customers/${customerId}/receipts`);
+}

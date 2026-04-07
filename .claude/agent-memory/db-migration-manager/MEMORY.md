@@ -76,8 +76,22 @@
 - **Problem**: RLS enabled but no INSERT policy means even service_role needs bypass or policy
 - **Solution**: Two INSERT policies - one for `service_role` (unrestricted), one for `authenticated` (own user_id only)
 
+### Receipts Table (migration 20260407000012; tab added in 000013)
+- `receipts` - business_id (FK businesses CASCADE), date DATE, reference TEXT, paid_by_type TEXT ('Contact'|'Other'), paid_by_contact_id UUID, paid_by_contact_type TEXT ('customer'|'supplier'), paid_by_other TEXT, received_in_account_id UUID (FK bank_accounts SET NULL), description TEXT, lines JSONB (array of {account_id, amount, total}), show_* BOOLEAN flags, image_url TEXT; RLS + service_role_all + GRANT ALL to service_role
+- Indexes: idx on business_id, date, paid_by_contact_id, paid_by_contact_type, received_in_account_id
+- admin_tabs entry: key='receipts', label='Receipts', order_index=6 (assumed)
+
+### Materialized Views (migration 20260407000014)
+- `business_suspense_balance` - business_id, suspense_balance NUMERIC; aggregates lines JSONB where account_id='suspense' from receipts; UNIQUE idx on business_id (required for REFRESH CONCURRENTLY); GRANT SELECT to service_role only
+- Refresh strategy: caller must call `REFRESH MATERIALIZED VIEW CONCURRENTLY public.business_suspense_balance` after every receipt write
+
+### Storage Buckets (migration 20260407000015)
+- `receipts` bucket — private (public=false), 20 MB limit, allowed MIME: image/jpeg, image/png, image/webp, image/gif, application/pdf
+- RLS: single policy `receipts_bucket_service_role_all` on `storage.objects` FOR ALL TO service_role WHERE bucket_id='receipts'
+- No access granted to anon or authenticated — FastAPI backend (service_role) proxies all file I/O
+
 ## File Locations
-- Migrations: `supabase/migrations/` (15 files through 20260407000009: uuid_v7, rbac_system, jwt_claims_hook, business_system, businesses_soft_delete, fix_audit_logs_rls, drop_business_details_redundant_columns, coa_accounts_type_is_total, backfill_coa_fixed, add_chart_of_accounts_tab, bank_accounts (+ 000004/000005 drop patches), customers, add_customers_tab, suppliers, add_suppliers_tab)
+- Migrations: `supabase/migrations/` (21 files through 20260407000015: uuid_v7, rbac_system, jwt_claims_hook, business_system, businesses_soft_delete, fix_audit_logs_rls, drop_business_details_redundant_columns, coa_accounts_type_is_total, backfill_coa_fixed, add_chart_of_accounts_tab, bank_accounts (+ 000004/000005 drop patches), customers, add_customers_tab, suppliers, add_suppliers_tab, add_history_tab, remove_history_tab, receipts, add_receipts_tab, suspense_materialized_view, receipt_attachments_bucket)
 - Seeds: `supabase/seeds/rbac_seed.sql`
 - Backend models: `backend/app/models/`
 - Backend schemas: `backend/app/schemas/`

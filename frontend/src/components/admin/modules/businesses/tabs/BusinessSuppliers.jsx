@@ -19,7 +19,14 @@ import {
   createSupplier,
   updateSupplier,
   deleteSupplier,
+  listSupplierReceipts,
 } from '@/lib/services/suppliers.service';
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = String(iso).slice(0, 10).split('-');
+  return `${parseInt(d)}/${parseInt(m)}/${y}`;
+}
 
 /* ── Loading skeleton ────────────────────────────────────────────────────── */
 
@@ -395,12 +402,24 @@ function EditDialog({ open, onOpenChange, businessId, supplier, onUpdated, onDel
 
 /* ── View dialog ─────────────────────────────────────────────────────────── */
 
-function ViewDialog({ open, onOpenChange, supplier }) {
+function ViewDialog({ open, onOpenChange, supplier, businessId }) {
+  const [receipts, setReceipts] = useState([]);
+  const [loadingReceipts, setLoadingReceipts] = useState(false);
+
+  useEffect(() => {
+    if (!open || !supplier) return;
+    setLoadingReceipts(true);
+    listSupplierReceipts(businessId, supplier.id)
+      .then((res) => setReceipts(res?.items ?? []))
+      .catch(() => setReceipts([]))
+      .finally(() => setLoadingReceipts(false));
+  }, [open, supplier, businessId]);
+
   if (!supplier) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Supplier Details</DialogTitle>
         </DialogHeader>
@@ -429,6 +448,46 @@ function ViewDialog({ open, onOpenChange, supplier }) {
             </tr>
           </tbody>
         </table>
+
+        {/* Receipts section */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Receipts
+          </p>
+          {loadingReceipts ? (
+            <div className="space-y-1.5">
+              {[1, 2].map((i) => <Skeleton key={i} className="h-8 w-full rounded" />)}
+            </div>
+          ) : receipts.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">No receipts linked to this supplier.</p>
+          ) : (
+            <div className="rounded-md border border-border overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Date</th>
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Reference</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {receipts.map((r) => {
+                    const total = (r.lines ?? []).reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0);
+                    return (
+                      <tr key={r.id} className="hover:bg-muted/20">
+                        <td className="px-3 py-2 text-foreground">{formatDate(r.date)}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.reference || '—'}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground">
+                          {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
@@ -502,6 +561,7 @@ export default function BusinessSuppliers({ business }) {
         open={!!viewTarget}
         onOpenChange={(v) => !v && setViewTarget(null)}
         supplier={viewTarget}
+        businessId={business.id}
       />
 
       {/* Page header */}

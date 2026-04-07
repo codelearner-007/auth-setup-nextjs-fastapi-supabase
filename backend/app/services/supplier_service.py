@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.supplier_repository import SupplierRepository
+from app.schemas.response.receipt import ReceiptListResponse, ReceiptResponse
 from app.schemas.response.supplier import SupplierListResponse, SupplierResponse
 
 
@@ -92,3 +93,20 @@ class SupplierService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Supplier not found",
             )
+
+    async def list_supplier_receipts(
+        self, business_id: str, supplier_id: str
+    ) -> ReceiptListResponse:
+        """Return all receipts for a specific supplier."""
+        await self._require_business(business_id)
+        supplier = await self.repo.get(business_id, supplier_id)
+        if not supplier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Supplier not found",
+            )
+        receipts = await self.repo.list_receipts(business_id, supplier_id)
+        return ReceiptListResponse(
+            items=[ReceiptResponse.model_validate(r) for r in receipts],
+            total=len(receipts),
+        )

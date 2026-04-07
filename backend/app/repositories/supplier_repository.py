@@ -3,6 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.receipt import Receipt
 from app.models.supplier import Supplier
 from app.repositories.base_repository import BaseRepository
 
@@ -83,3 +84,16 @@ class SupplierRepository(BaseRepository[Supplier]):
         await self.session.delete(supplier)
         await self.session.flush()
         return True
+
+    async def list_receipts(self, business_id: str, supplier_id: str) -> list[Receipt]:
+        """Return all receipts linked to this supplier, ordered by date DESC."""
+        result = await self.session.execute(
+            select(Receipt)
+            .where(
+                Receipt.business_id == business_id,
+                Receipt.paid_by_contact_id == supplier_id,
+                Receipt.paid_by_contact_type == "supplier",
+            )
+            .order_by(Receipt.date.desc(), Receipt.created_at.desc())
+        )
+        return list(result.scalars().all())

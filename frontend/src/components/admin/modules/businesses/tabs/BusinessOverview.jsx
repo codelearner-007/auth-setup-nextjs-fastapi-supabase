@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { listCoaGroups, listCoaAccounts } from '@/lib/services/coa.service';
+import { getSuspenseBalance } from '@/lib/services/suspense.service';
+import BusinessSuspense from './BusinessSuspense';
 
 function CoaSkeleton() {
   return (
@@ -80,16 +82,20 @@ export default function BusinessFinancialSummary({ business }) {
   const [groups, setGroups] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [suspenseBalance, setSuspenseBalance] = useState(0);
+  const [showSuspense, setShowSuspense] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [groupsData, accountsData] = await Promise.all([
+      const [groupsData, accountsData, suspenseData] = await Promise.all([
         listCoaGroups(business.id),
         listCoaAccounts(business.id),
+        getSuspenseBalance(business.id).catch(() => ({ suspense_balance: 0 })),
       ]);
       setGroups(groupsData.items || groupsData || []);
       setAccounts(accountsData.items || accountsData || []);
+      setSuspenseBalance(parseFloat(suspenseData?.suspense_balance ?? 0));
     } catch {
       setGroups([]);
       setAccounts([]);
@@ -103,6 +109,10 @@ export default function BusinessFinancialSummary({ business }) {
   }, [fetchData]);
 
   if (isLoading) return <CoaSkeleton />;
+
+  if (showSuspense) {
+    return <BusinessSuspense business={business} onBack={() => setShowSuspense(false)} />;
+  }
 
   const bsGroups = groups.filter((g) => g.type === 'balance_sheet');
   const plGroups = groups.filter((g) => g.type === 'pl');
@@ -118,6 +128,19 @@ export default function BusinessFinancialSummary({ business }) {
           {bsGroups.map((group) => (
             <GroupCard key={group.id} group={group} accounts={accounts} />
           ))}
+          {suspenseBalance !== 0 && (
+            <button
+              onClick={() => setShowSuspense(true)}
+              className="w-full rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 shadow-sm overflow-hidden hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm font-bold text-amber-700 dark:text-amber-400">Suspense</span>
+                <span className="text-sm font-semibold text-amber-700 dark:text-amber-400 tabular-nums">
+                  {suspenseBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* Right: P&L */}

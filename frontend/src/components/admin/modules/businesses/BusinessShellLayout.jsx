@@ -38,6 +38,7 @@ import BusinessBankAndCashAccounts from './tabs/BusinessBankAndCashAccounts';
 import BusinessCustomers from './tabs/BusinessCustomers';
 import BusinessSuppliers from './tabs/BusinessSuppliers';
 import BusinessHistory from './tabs/BusinessHistory';
+import BusinessReceipts from './tabs/BusinessReceipts';
 const TAB_ICONS = {
   summary: LayoutDashboard,
   'bank-and-cash-accounts': Landmark,
@@ -62,6 +63,7 @@ const TAB_COMPONENTS = {
   'bank-and-cash-accounts': BusinessBankAndCashAccounts,
   customers: BusinessCustomers,
   suppliers: BusinessSuppliers,
+  receipt: BusinessReceipts,
 };
 
 // Sub-pages rendered under the Settings tab via ?tab=settings&page=<key>

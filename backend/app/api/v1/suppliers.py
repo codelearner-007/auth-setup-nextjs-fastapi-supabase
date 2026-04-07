@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user, get_db, require_role
 from app.schemas.auth import CurrentUser
 from app.schemas.request.supplier import SupplierCreate, SupplierUpdate
+from app.schemas.response.receipt import ReceiptListResponse
 from app.schemas.response.supplier import SupplierListResponse, SupplierResponse
 from app.services.audit_service import AuditService
 from app.services.supplier_service import SupplierService
@@ -58,6 +59,15 @@ async def get_supplier(
     db: AsyncSession = Depends(get_db),
 ) -> SupplierResponse:
     return await SupplierService(db).get_supplier(business_id, supplier_id)
+
+
+@router.get("/{supplier_id}/receipts", response_model=ReceiptListResponse, dependencies=_ROLE_DEP)
+async def list_supplier_receipts(
+    business_id: str,
+    supplier_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ReceiptListResponse:
+    return await SupplierService(db).list_supplier_receipts(business_id, supplier_id)
 
 
 @router.put("/{supplier_id}", response_model=SupplierResponse, dependencies=_ROLE_DEP)

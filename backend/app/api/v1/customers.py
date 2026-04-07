@@ -7,6 +7,7 @@ from app.core.dependencies import get_current_user, get_db, require_role
 from app.schemas.auth import CurrentUser
 from app.schemas.request.customer import CustomerCreate, CustomerUpdate
 from app.schemas.response.customer import CustomerListResponse, CustomerResponse
+from app.schemas.response.receipt import ReceiptListResponse
 from app.services.audit_service import AuditService
 from app.services.customer_service import CustomerService
 
@@ -58,6 +59,15 @@ async def get_customer(
     db: AsyncSession = Depends(get_db),
 ) -> CustomerResponse:
     return await CustomerService(db).get_customer(business_id, customer_id)
+
+
+@router.get("/{customer_id}/receipts", response_model=ReceiptListResponse, dependencies=_ROLE_DEP)
+async def list_customer_receipts(
+    business_id: str,
+    customer_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ReceiptListResponse:
+    return await CustomerService(db).list_customer_receipts(business_id, customer_id)
 
 
 @router.put("/{customer_id}", response_model=CustomerResponse, dependencies=_ROLE_DEP)

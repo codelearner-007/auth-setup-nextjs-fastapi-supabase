@@ -10,6 +10,7 @@ from app.models.business_tab import BusinessTab
 from app.models.coa_account import CoaAccount
 from app.models.coa_group import CoaGroup
 from app.models.customer import Customer
+from app.models.receipt import Receipt
 from app.models.supplier import Supplier
 from app.models.permission import Permission
 from app.models.role import Role
@@ -28,6 +29,7 @@ __all__ = [
     "CoaAccount",
     "CoaGroup",
     "Customer",
+    "Receipt",
     "Supplier",
     "Permission",
     "Role",

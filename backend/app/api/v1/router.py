@@ -14,8 +14,10 @@ from app.api.v1 import (
     modules,
     permissions,
     profile,
+    receipts,
     roles,
     suppliers,
+    suspense,
     user_roles,
     users,
 )
@@ -38,4 +40,6 @@ api_router.include_router(coa.router)
 api_router.include_router(bank_accounts.router)
 api_router.include_router(customers.router)
 api_router.include_router(suppliers.router)
+api_router.include_router(receipts.router)
+api_router.include_router(suspense.router)
 api_router.include_router(admin_tabs.router)

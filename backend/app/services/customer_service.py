@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.customer_repository import CustomerRepository
 from app.schemas.response.customer import CustomerListResponse, CustomerResponse
+from app.schemas.response.receipt import ReceiptListResponse, ReceiptResponse
 
 
 class CustomerService:
@@ -92,3 +93,20 @@ class CustomerService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Customer not found",
             )
+
+    async def list_customer_receipts(
+        self, business_id: str, customer_id: str
+    ) -> ReceiptListResponse:
+        """Return all receipts for a specific customer."""
+        await self._require_business(business_id)
+        customer = await self.repo.get(business_id, customer_id)
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Customer not found",
+            )
+        receipts = await self.repo.list_receipts(business_id, customer_id)
+        return ReceiptListResponse(
+            items=[ReceiptResponse.model_validate(r) for r in receipts],
+            total=len(receipts),
+        )

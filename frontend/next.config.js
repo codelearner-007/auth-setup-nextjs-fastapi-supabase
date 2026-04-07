@@ -2,6 +2,16 @@ const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'oakcwujixfakldsuryqx.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
+
   async rewrites() {
     // FastAPI backend URL
     const apiUrl =
