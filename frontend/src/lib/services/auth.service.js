@@ -29,10 +29,6 @@ export const authService = {
     return apiClient.post('/auth/reset-password', data);
   },
 
-  async exchangeCodeForSession(code) {
-    await apiClient.post('/auth/callback', { code });
-  },
-
   async setupMFA() {
     return apiClient.post('/auth/mfa/setup');
   },
