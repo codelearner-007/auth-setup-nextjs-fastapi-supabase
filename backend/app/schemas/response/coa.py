@@ -11,8 +11,8 @@ class CoaGroupResponse(BaseModel):
     name: str
     type: str
     parent_group_id: str | None
-    is_fixed: bool
-    order_index: int
+    is_system: bool
+    sort_order: int
 
 
 class CoaGroupListResponse(BaseModel):
@@ -28,11 +28,13 @@ class CoaAccountResponse(BaseModel):
     name: str
     code: str | None
     group_id: str | None
+    parent_id: str | None
     cash_flow_category: str | None
     type: str
-    is_total: bool
-    is_fixed: bool
-    order_index: int
+    description: str | None
+    is_system: bool
+    is_active: bool
+    sort_order: int
 
 
 class CoaAccountListResponse(BaseModel):

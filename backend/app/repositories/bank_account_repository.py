@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bank_account import BankAccount
@@ -89,6 +89,13 @@ class BankAccountRepository(BaseRepository[BankAccount]):
         await self.session.delete(account)
         await self.session.flush()
         return True
+
+    async def count_by_business(self, business_id: str) -> int:
+        """Return the total number of bank accounts for the given business."""
+        result = await self.session.execute(
+            select(func.count()).where(BankAccount.business_id == business_id)
+        )
+        return result.scalar_one()
 
     async def recalculate_balance(
         self, business_id: str, bank_account_id: str

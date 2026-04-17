@@ -62,7 +62,7 @@ function GroupCard({ group, accounts, bankTotal }) {
           >
             <span
               className={
-                account.is_total
+                account.type === 'total'
                   ? 'text-xs text-muted-foreground italic'
                   : 'text-sm text-muted-foreground'
               }
@@ -71,7 +71,7 @@ function GroupCard({ group, accounts, bankTotal }) {
             </span>
             <span
               className={
-                account.is_total
+                account.type === 'total'
                   ? 'text-xs font-medium text-primary tabular-nums'
                   : 'text-sm text-foreground tabular-nums'
               }

@@ -1114,7 +1114,7 @@ export default function BusinessReceipts({ business, onBankRefresh, bankRefreshK
       setFormData({
         bankAccounts: bankRes?.items ?? (Array.isArray(bankRes) ? bankRes : []),
         coaAccounts: (coaRes?.items ?? (Array.isArray(coaRes) ? coaRes : [])).filter(
-          (a) => a.type === 'pl' && !a.is_total
+          (a) => ['income', 'expense'].includes(a.type)
         ),
         customers: custRes?.items ?? [],
         suppliers: suppRes?.items ?? [],

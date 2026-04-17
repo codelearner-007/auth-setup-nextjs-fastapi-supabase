@@ -82,3 +82,35 @@
 - Critical bug: owner_id is REQUIRED in CreateBusinessRequest (Pydantic), but frontend only sends it conditionally (`if user?.id`). If GlobalContext user is null at submit time, API call will fail with 422.
 - Service layer: business.service.js calls /v1/businesses (correct path, goes through rewrite)
 - No CSRF issue: businesses API goes through FastAPI (no Next.js route), not subject to enforceSameOrigin
+
+## COA Refactor (2026-04-17) — Migration 20260417000000_coa_refactor_account_types.sql
+- MIGRATION APPLIED to cloud Supabase (verified 2026-04-17)
+- DB schema confirmed: is_system, sort_order, type=asset|liability|equity|income|expense|total
+- Old columns (is_fixed, order_index, is_total) confirmed REMOVED from both coa_accounts and coa_groups
+- All 6 new indexes created: idx_coa_accounts_type, is_system, is_active, parent_id, sort_order; idx_coa_groups_sort_order
+- Live data: Test-100 business has 5 accounts (equity/asset/income/total types), 5 groups (balance_sheet/pl)
+- 'Salaries' migrated to type=income (was pl+not is_total); user can fix type via Edit Account in UI
+- Backend models, schemas, repository, service ALL use new field names — verified clean
+- Frontend BusinessChartOfAccounts.jsx fully updated: Type dropdown present, xl: breakpoints, no is_total/is_fixed refs
+- BusinessOverview.jsx: correctly uses `account.type === 'total'` for italic styling
+- BusinessReceipts.jsx: correctly filters `['income', 'expense'].includes(a.type)` for line item accounts (excludes totals)
+- BusinessReceipts.jsx line 1163: `order_index` refers to business_tab_columns.order_index (NOT coa_accounts) — correct
+- Group type field is still 'balance_sheet' | 'pl' — unchanged by refactor (only account type changed)
+- PANEL_ACCOUNT_TYPES in COA component: `balance_sheet: ['asset','liability','equity'], pl: ['income','expense','total']`
+- ACCOUNT_TYPE_OPTIONS only shows income/expense for P&L panel (no total option) — total has its own TotalDialog
+- Build: `npx next build` passes clean (0 errors, 0 warnings)
+- Ruff lint: all COA backend files pass clean
+- Python schema validation: balance_sheet/pl types correctly rejected by Pydantic Literal validator
+- Cloud DB credentials: psycopg2 host=aws-1-ap-northeast-1.pooler.supabase.com user=postgres.oakcwujixfakldsuryqx pw=BookVault@123
+
+## Cash & Cash Equivalents Auto-Creation (2026-04-17)
+- Feature tested and WORKING correctly via API
+- Trigger: first bank account creation for a business (is_first = count==0 before insert)
+- Creates: "Cash and Cash Equivalents" (asset) + "Inter Account Transfers" (equity), both is_system=True
+- Idempotency: confirmed — second bank account creation does NOT duplicate system accounts
+- Group linking: group_id=None when business has no seeded COA groups (group lookup returns None gracefully)
+- Group linking: would assign correct group_id IF business has Assets/Equity groups already seeded
+- Existing businesses (Test-100): do NOT get auto-created accounts retroactively (only on new first-account creation)
+- Playwright MCP not available in this environment — tested via direct API calls with JWT tokens
+- Test credentials reset: officialfarhan1996@gmail.com and bookvault26@gmail.com both reset to TestPass@123
+- Users: officialfarhan1996 owns promo+test-1; bookvault26 owns Test-10+test-2+Test-100

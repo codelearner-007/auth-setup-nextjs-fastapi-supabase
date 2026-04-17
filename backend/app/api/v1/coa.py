@@ -179,7 +179,8 @@ async def create_account(
         group_id=body.group_id,
         cash_flow_category=body.cash_flow_category,
         type_=body.type,
-        is_total=body.is_total,
+        description=body.description,
+        is_active=body.is_active,
     )
 
 
@@ -245,7 +246,8 @@ async def update_account(
         cash_flow_category=body.cash_flow_category,
         update_cash_flow="cash_flow_category" in body.model_fields_set,
         type_=body.type,
-        is_total=body.is_total,
+        description=body.description,
+        is_active=body.is_active,
     )
 
 

@@ -17,11 +17,11 @@ class CoaRepository(BaseRepository[CoaGroup]):
     # ------------------------------------------------------------------ Groups
 
     async def list_groups(self, business_id: str) -> list[CoaGroup]:
-        """Return all COA groups for the given business, ordered by order_index then id."""
+        """Return all COA groups for the given business, ordered by sort_order then id."""
         result = await self.session.execute(
             select(CoaGroup)
             .where(CoaGroup.business_id == business_id)
-            .order_by(CoaGroup.order_index.asc(), CoaGroup.id.asc())
+            .order_by(CoaGroup.sort_order.asc(), CoaGroup.id.asc())
         )
         return list(result.scalars().all())
 
@@ -41,8 +41,8 @@ class CoaRepository(BaseRepository[CoaGroup]):
         name: str,
         type_: str,
         parent_group_id: str | None,
-        is_fixed: bool = False,
-        order_index: int = 0,
+        is_system: bool = False,
+        sort_order: int = 0,
     ) -> CoaGroup:
         """Insert a new COA group and return the persisted instance."""
         group = CoaGroup(
@@ -50,8 +50,8 @@ class CoaRepository(BaseRepository[CoaGroup]):
             name=name,
             type=type_,
             parent_group_id=parent_group_id,
-            is_fixed=is_fixed,
-            order_index=order_index,
+            is_system=is_system,
+            sort_order=sort_order,
         )
         self.session.add(group)
         await self.session.flush()
@@ -93,7 +93,7 @@ class CoaRepository(BaseRepository[CoaGroup]):
         parent_group_id: str | None,
         ids: list[str],
     ) -> bool:
-        """Assign order_index for each group id based on its position in ids list."""
+        """Assign sort_order for each group id based on its position in ids list."""
         for idx, group_id in enumerate(ids):
             await self.session.execute(
                 update(CoaGroup)
@@ -105,7 +105,7 @@ class CoaRepository(BaseRepository[CoaGroup]):
                     if parent_group_id is not None
                     else CoaGroup.parent_group_id.is_(None),
                 )
-                .values(order_index=idx)
+                .values(sort_order=idx)
             )
         await self.session.flush()
         return True
@@ -113,11 +113,11 @@ class CoaRepository(BaseRepository[CoaGroup]):
     # ---------------------------------------------------------------- Accounts
 
     async def list_accounts(self, business_id: str) -> list[CoaAccount]:
-        """Return all COA accounts for the given business, ordered by order_index then id."""
+        """Return all COA accounts for the given business, ordered by sort_order then id."""
         result = await self.session.execute(
             select(CoaAccount)
             .where(CoaAccount.business_id == business_id)
-            .order_by(CoaAccount.order_index.asc(), CoaAccount.id.asc())
+            .order_by(CoaAccount.sort_order.asc(), CoaAccount.id.asc())
         )
         return list(result.scalars().all())
 
@@ -131,6 +131,24 @@ class CoaRepository(BaseRepository[CoaGroup]):
         )
         return result.scalar_one_or_none()
 
+    async def get_group_by_name(self, business_id: str, name: str) -> CoaGroup | None:
+        """Return the first COA group matching name for this business, or None."""
+        result = await self.session.execute(
+            select(CoaGroup)
+            .where(CoaGroup.business_id == business_id, CoaGroup.name == name)
+            .limit(1)
+        )
+        return result.scalars().first()
+
+    async def get_account_by_name(self, business_id: str, name: str) -> CoaAccount | None:
+        """Return the first COA account matching name for this business, or None."""
+        result = await self.session.execute(
+            select(CoaAccount)
+            .where(CoaAccount.business_id == business_id, CoaAccount.name == name)
+            .limit(1)
+        )
+        return result.scalars().first()
+
     async def create_account(
         self,
         business_id: str,
@@ -138,10 +156,11 @@ class CoaRepository(BaseRepository[CoaGroup]):
         code: str | None = None,
         group_id: str | None = None,
         cash_flow_category: str | None = None,
-        type_: str = "pl",
-        is_total: bool = False,
-        is_fixed: bool = False,
-        order_index: int = 0,
+        type_: str = "income",
+        is_system: bool = False,
+        sort_order: int = 0,
+        description: str | None = None,
+        is_active: bool = True,
     ) -> CoaAccount:
         """Insert a new COA account and return the persisted instance."""
         account = CoaAccount(
@@ -151,9 +170,10 @@ class CoaRepository(BaseRepository[CoaGroup]):
             group_id=group_id,
             cash_flow_category=cash_flow_category,
             type=type_,
-            is_total=is_total,
-            is_fixed=is_fixed,
-            order_index=order_index,
+            is_system=is_system,
+            sort_order=sort_order,
+            description=description,
+            is_active=is_active,
         )
         self.session.add(account)
         await self.session.flush()
@@ -172,8 +192,9 @@ class CoaRepository(BaseRepository[CoaGroup]):
         code: str | None,
         update_code: bool,
         type_: str | None,
-        is_total: bool | None,
-        is_fixed: bool | None = None,
+        is_system: bool | None = None,
+        description: str | None = None,
+        is_active: bool | None = None,
     ) -> CoaAccount | None:
         """Update mutable fields on a COA account. Returns None if not found."""
         account = await self.get_account(business_id, account_id)
@@ -189,10 +210,12 @@ class CoaRepository(BaseRepository[CoaGroup]):
             account.code = code
         if type_ is not None:
             account.type = type_
-        if is_total is not None:
-            account.is_total = is_total
-        if is_fixed is not None:
-            account.is_fixed = is_fixed
+        if is_system is not None:
+            account.is_system = is_system
+        if description is not None:
+            account.description = description
+        if is_active is not None:
+            account.is_active = is_active
         await self.session.flush()
         await self.session.refresh(account)
         return account
@@ -212,7 +235,7 @@ class CoaRepository(BaseRepository[CoaGroup]):
         group_id: str | None,
         ids: list[str],
     ) -> bool:
-        """Assign order_index for each account id based on its position in ids list."""
+        """Assign sort_order for each account id based on its position in ids list."""
         for idx, account_id in enumerate(ids):
             await self.session.execute(
                 update(CoaAccount)
@@ -223,57 +246,55 @@ class CoaRepository(BaseRepository[CoaGroup]):
                     if group_id is not None
                     else CoaAccount.group_id.is_(None),
                 )
-                .values(order_index=idx)
+                .values(sort_order=idx)
             )
         await self.session.flush()
         return True
 
     async def seed_default_coa(self, business_id: str) -> None:
-        """Seed the default fixed COA structure for a newly created business.
+        """Seed the default system COA structure for a newly created business.
 
         Balance Sheet:
-          - Assets (group, is_fixed, order 0)
-          - Liabilities (group, is_fixed, order 1)
-          - Equity (group, is_fixed, order 2)
-              └── Retained Earnings (account under Equity, is_fixed, order 0)
+          - Assets (group, is_system, sort 0)
+          - Liabilities (group, is_system, sort 1)
+          - Equity (group, is_system, sort 2)
+              └── Retained Earnings (account under Equity, is_system, sort 0)
 
         Profit & Loss:
-          - Net Profit (Loss) (account, is_fixed, is_total, no group, order 0)
+          - Net Profit (Loss) (account, is_system, type=total, no group, sort 0)
         """
-        # Balance Sheet fixed groups
+        # Balance Sheet system groups
         assets = await self.create_group(
-            business_id, "Assets", "balance_sheet", None, is_fixed=True, order_index=0
+            business_id, "Assets", "balance_sheet", None, is_system=True, sort_order=0
         )
         await self.create_group(
-            business_id, "Liabilities", "balance_sheet", None, is_fixed=True, order_index=1
+            business_id, "Liabilities", "balance_sheet", None, is_system=True, sort_order=1
         )
         equity = await self.create_group(
-            business_id, "Equity", "balance_sheet", None, is_fixed=True, order_index=2
+            business_id, "Equity", "balance_sheet", None, is_system=True, sort_order=2
         )
 
-        # Retained Earnings under Equity (fixed account)
+        # Retained Earnings under Equity (system account)
         await self.create_account(
             business_id=business_id,
             name="Retained Earnings",
             group_id=equity.id,
             cash_flow_category=None,
-            type_="balance_sheet",
-            is_total=False,
-            is_fixed=True,
-            order_index=0,
+            type_="equity",
+            is_system=True,
+            sort_order=0,
         )
 
         # Suppress unused variable warning — assets group is seeded but has no default accounts
         _ = assets
 
-        # Net Profit (Loss) — fixed P&L total account (ungrouped)
+        # Net Profit (Loss) — system P&L total account (ungrouped)
         await self.create_account(
             business_id=business_id,
             name="Net Profit (Loss)",
             group_id=None,
             cash_flow_category=None,
-            type_="pl",
-            is_total=True,
-            is_fixed=True,
-            order_index=0,
+            type_="total",
+            is_system=True,
+            sort_order=0,
         )

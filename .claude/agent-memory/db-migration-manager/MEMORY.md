@@ -32,8 +32,8 @@
 - `business_format` - 1:1 with businesses (UNIQUE business_id); date_format, time_format, first_day_of_week, number_format
 - `business_tabs` - per-business tabs; UNIQUE(business_id, key); idx on business_id
 - `admin_tabs` - global tabs; key UNIQUE; seeded with: summary(0), journal-entries(1), reports(2), settings(3)
-- `coa_groups` - COA groups, self-referential parent_group_id (SET NULL); type='balance_sheet'|'pl'; idx on business_id
-- `coa_accounts` - COA accounts; group_id FK coa_groups (SET NULL); idx on business_id
+- `coa_groups` - COA groups, self-referential parent_group_id (SET NULL); type='balance_sheet'|'pl'; **is_system** (renamed from is_fixed, 20260417000000); **sort_order** (renamed from order_index, 20260417000000); idx on business_id
+- `coa_accounts` - COA accounts; group_id FK coa_groups (SET NULL); **type** now asset|liability|equity|income|expense|total (20260417000000, was balance_sheet|pl); **is_system** (renamed from is_fixed); **sort_order** (renamed from order_index); **description** TEXT nullable; **is_active** BOOLEAN DEFAULT TRUE; **parent_id** UUID self-FK SET NULL; is_total DROPPED (absorbed into type='total'); idx on business_id
 - All 7 business tables: RLS enabled, single `<table>_service_role_all` policy (service_role FOR ALL), GRANT ALL to service_role only
 
 ### Key Functions
@@ -105,7 +105,7 @@
 - Pattern note: COALESCE to 0 ensures accounts with no receipts still equal opening_balance
 
 ## File Locations
-- Migrations: `supabase/migrations/` (25 files through 20260407000019: uuid_v7, rbac_system, jwt_claims_hook, business_system, businesses_soft_delete, fix_audit_logs_rls, drop_business_details_redundant_columns, coa_accounts_type_is_total, backfill_coa_fixed, add_chart_of_accounts_tab, bank_accounts (+ 000004/000005 drop patches), customers, add_customers_tab, suppliers, add_suppliers_tab, add_history_tab, remove_history_tab, receipts, add_receipts_tab, suspense_materialized_view, receipt_attachments_bucket, receipts_composite_index, business_ui_preferences, business_tab_columns, recalculate_bank_balance_trigger)
+- Migrations: `supabase/migrations/` (26 files through 20260417000000: uuid_v7, rbac_system, jwt_claims_hook, business_system, businesses_soft_delete, fix_audit_logs_rls, drop_business_details_redundant_columns, coa_accounts_type_is_total, backfill_coa_fixed, add_chart_of_accounts_tab, bank_accounts (+ 000004/000005 drop patches), customers, add_customers_tab, suppliers, add_suppliers_tab, add_history_tab, remove_history_tab, receipts, add_receipts_tab, suspense_materialized_view, receipt_attachments_bucket, receipts_composite_index, business_ui_preferences, business_tab_columns, recalculate_bank_balance_trigger, coa_refactor_account_types)
 - Seeds: `supabase/seeds/rbac_seed.sql`
 - Backend models: `backend/app/models/`
 - Backend schemas: `backend/app/schemas/`

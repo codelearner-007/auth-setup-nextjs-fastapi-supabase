@@ -70,6 +70,23 @@ import {
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
+const PANEL_ACCOUNT_TYPES = {
+  balance_sheet: ['asset', 'liability', 'equity'],
+  pl: ['income', 'expense', 'total'],
+};
+
+const ACCOUNT_TYPE_OPTIONS = {
+  balance_sheet: [
+    { value: 'asset', label: 'Asset' },
+    { value: 'liability', label: 'Liability' },
+    { value: 'equity', label: 'Equity' },
+  ],
+  pl: [
+    { value: 'income', label: 'Income' },
+    { value: 'expense', label: 'Expense' },
+  ],
+};
+
 const CASH_FLOW_OPTIONS = [
   { value: 'operating', label: 'Operating' },
   { value: 'investing', label: 'Investing' },
@@ -91,9 +108,9 @@ function CoaSkeleton() {
       </div>
 
       {/* Two-panel skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border gap-0">
+      <div className="grid grid-cols-1 xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-border gap-0">
         {/* BS panel */}
-        <div className="pb-8 lg:pb-0 lg:pr-6 space-y-3">
+        <div className="pb-8 xl:pb-0 xl:pr-6 space-y-3">
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-32" />
             <div className="flex gap-1.5">
@@ -116,7 +133,7 @@ function CoaSkeleton() {
         </div>
 
         {/* PL panel */}
-        <div className="pt-8 lg:pt-0 lg:pl-6 space-y-3">
+        <div className="pt-8 xl:pt-0 xl:pl-6 space-y-3">
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-40" />
             <div className="flex gap-1.5">
@@ -324,6 +341,7 @@ function GroupDialog({ open, onOpenChange, panelType, initialData, onSave }) {
 
 function AccountDialog({ open, onOpenChange, panelType, groups, initialData, onSave }) {
   const [name, setName] = useState('');
+  const [accountType, setAccountType] = useState('asset');
   const [groupId, setGroupId] = useState('');
   const [cashFlow, setCashFlow] = useState('');
   const [code, setCode] = useState('');
@@ -335,12 +353,13 @@ function AccountDialog({ open, onOpenChange, panelType, groups, initialData, onS
   useEffect(() => {
     if (open) {
       setName(initialData?.name ?? '');
+      setAccountType(initialData?.type ?? (panelType === 'balance_sheet' ? 'asset' : 'income'));
       setGroupId(initialData?.group_id ?? '');
       setCashFlow(initialData?.cash_flow_category ?? '');
       setCode(initialData?.code ?? '');
       setError(null);
     }
-  }, [open, initialData]);
+  }, [open, initialData, panelType]);
 
   async function handleSave() {
     if (!name.trim()) {
@@ -354,8 +373,7 @@ function AccountDialog({ open, onOpenChange, panelType, groups, initialData, onS
         name: name.trim(),
         code: code.trim() || null,
         group_id: groupId || null,
-        type: panelType,
-        is_total: false,
+        type: accountType,
       };
       if (panelType === 'pl' && cashFlow) {
         payload.cash_flow_category = cashFlow;
@@ -402,6 +420,20 @@ function AccountDialog({ open, onOpenChange, panelType, groups, initialData, onS
               onChange={(e) => setCode(e.target.value)}
               disabled={saving}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="account-type">Type <span className="text-destructive" aria-hidden="true">*</span></Label>
+            <Select value={accountType} onValueChange={setAccountType} disabled={saving}>
+              <SelectTrigger id="account-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCOUNT_TYPE_OPTIONS[panelType].map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -470,7 +502,7 @@ function TotalDialog({ open, onOpenChange, panelType, onSave }) {
     setSaving(true);
     setError(null);
     try {
-      await onSave({ name: name.trim(), type: panelType, is_total: true });
+      await onSave({ name: name.trim(), type: 'total' });
       onOpenChange(false);
     } catch (err) {
       setError(err?.message ?? 'Failed to create total row.');
@@ -526,7 +558,7 @@ function GroupRows({ group, accounts, onEditGroup, onDeleteGroup, onEditAccount,
           <div className="flex items-center gap-1.5">
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
             <span className="text-sm font-semibold text-foreground">{group.name}</span>
-            {group.is_fixed && (
+            {group.is_system && (
               <Lock
                 className="h-3 w-3 text-muted-foreground/40 ml-1 flex-shrink-0"
                 title="System group — cannot be modified"
@@ -536,7 +568,7 @@ function GroupRows({ group, accounts, onEditGroup, onDeleteGroup, onEditAccount,
         </td>
         <td className="px-4 py-3 w-24 text-right">
           <div className="flex items-center justify-end gap-0.5">
-            {!group.is_fixed && (
+            {!group.is_system && (
               <>
                 <Button
                   variant="ghost"
@@ -593,12 +625,12 @@ function AccountRow({ account, onEdit, onDelete, onReorderAccounts, indented }) 
   return (
     <tr className="group hover:bg-muted/40 transition-colors duration-150">
       <td className={`px-4 py-3 text-sm ${indented ? 'pl-10' : ''}`}>
-        {account.is_total ? (
+        {account.type === 'total' ? (
           <span className="italic text-muted-foreground">{account.name}</span>
         ) : (
           <span className="text-foreground">{account.name}</span>
         )}
-        {account.is_fixed && (
+        {account.is_system && (
           <Lock
             className="inline-block h-3 w-3 text-muted-foreground/40 ml-1.5 relative -top-px"
             title="System account — cannot be modified"
@@ -607,7 +639,7 @@ function AccountRow({ account, onEdit, onDelete, onReorderAccounts, indented }) 
       </td>
       <td className="px-4 py-3 w-24 text-right">
         <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          {!account.is_fixed && (
+          {!account.is_system && (
             <>
               <Button
                 variant="ghost"
@@ -657,7 +689,7 @@ function CoaPanel({
   businessId,
 }) {
   const panelGroups = groups.filter((g) => g.type === panelType);
-  const ungrouped = accounts.filter((a) => a.type === panelType && !a.group_id);
+  const ungrouped = accounts.filter((a) => PANEL_ACCOUNT_TYPES[panelType].includes(a.type) && !a.group_id);
 
   // Group dialog state
   const [groupDialog, setGroupDialog] = useState({ open: false, data: null });

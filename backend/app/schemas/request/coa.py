@@ -4,7 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-_AccountType = Literal["balance_sheet", "pl"]
+_GroupPanelType = Literal["balance_sheet", "pl"]
+_AccountType = Literal["asset", "liability", "equity", "income", "expense", "total"]
 _CashFlow = Literal["operating", "investing", "financing", "cash_equivalent"] | None
 
 
@@ -12,7 +13,7 @@ class CoaGroupCreate(BaseModel):
     """Request body for creating a new COA group."""
 
     name: str = Field(..., min_length=1)
-    type: _AccountType
+    type: _GroupPanelType
     parent_group_id: str | None = None
 
 
@@ -30,9 +31,10 @@ class CoaAccountCreate(BaseModel):
     code: str | None = None
     group_id: str | None = None
     cash_flow_category: _CashFlow = None
-    type: _AccountType = "pl"
-    is_total: bool = False
-    is_fixed: bool = False
+    type: _AccountType = "income"
+    description: str | None = None
+    is_system: bool = False
+    is_active: bool = True
 
 
 class CoaAccountUpdate(BaseModel):
@@ -43,14 +45,15 @@ class CoaAccountUpdate(BaseModel):
     group_id: str | None = None
     cash_flow_category: _CashFlow = None
     type: _AccountType | None = None
-    is_total: bool | None = None
-    is_fixed: bool | None = None
+    description: str | None = None
+    is_system: bool | None = None
+    is_active: bool | None = None
 
 
 class CoaGroupsOrderUpdate(BaseModel):
     """Request body for reordering COA groups within a type/parent bucket."""
 
-    type: _AccountType
+    type: _GroupPanelType
     parent_group_id: str | None = None
     items: list[str]
 

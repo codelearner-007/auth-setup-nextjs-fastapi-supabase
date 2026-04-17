@@ -31,11 +31,18 @@ class CoaAccount(Base, TimestampMixin):
         nullable=True,
         index=True,
     )
+    parent_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("coa_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     cash_flow_category: Mapped[str | None] = mapped_column(Text, nullable=True)
-    type: Mapped[str] = mapped_column(Text, nullable=False, default="pl")
-    is_total: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_fixed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    type: Mapped[str] = mapped_column(Text, nullable=False, default="income")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     def __repr__(self) -> str:
         return f"<CoaAccount(id={self.id}, name={self.name}, business_id={self.business_id})>"

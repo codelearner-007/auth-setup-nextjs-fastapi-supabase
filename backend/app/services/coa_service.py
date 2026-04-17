@@ -64,7 +64,7 @@ class CoaService:
         """Create a new COA group under the given business."""
         await self._require_business(business_id, owner_id)
         group = await self.repo.create_group(
-            business_id, name, type_, parent_group_id, is_fixed=False
+            business_id, name, type_, parent_group_id, is_system=False
         )
         return CoaGroupResponse.model_validate(group)
 
@@ -76,7 +76,7 @@ class CoaService:
         name: str | None,
         parent_group_id: str | None,
     ) -> CoaGroupResponse:
-        """Update a COA group, raising 403 if fixed or 404 if not found."""
+        """Update a COA group, raising 403 if system or 404 if not found."""
         await self._require_business(business_id, owner_id)
         group = await self.repo.get_group(business_id, group_id)
         if not group:
@@ -84,10 +84,10 @@ class CoaService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="COA group not found",
             )
-        if group.is_fixed:
+        if group.is_system:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This group is fixed and cannot be modified.",
+                detail="This group is system-managed and cannot be modified.",
             )
         updated = await self.repo.update_group(business_id, group_id, name, parent_group_id)
         return CoaGroupResponse.model_validate(updated)
@@ -95,7 +95,7 @@ class CoaService:
     async def delete_group(
         self, business_id: str, group_id: str, owner_id: str
     ) -> None:
-        """Delete a COA group, raising 403 if fixed or 404 if not found."""
+        """Delete a COA group, raising 403 if system or 404 if not found."""
         await self._require_business(business_id, owner_id)
         group = await self.repo.get_group(business_id, group_id)
         if not group:
@@ -103,10 +103,10 @@ class CoaService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="COA group not found",
             )
-        if group.is_fixed:
+        if group.is_system:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This group is fixed and cannot be deleted.",
+                detail="This group is system-managed and cannot be deleted.",
             )
         await self.repo.delete_group(business_id, group_id)
 
@@ -157,7 +157,8 @@ class CoaService:
         group_id: str | None,
         cash_flow_category: str | None,
         type_: str,
-        is_total: bool,
+        description: str | None,
+        is_active: bool,
     ) -> CoaAccountResponse:
         """Create a new COA account under the given business."""
         await self._require_business(business_id, owner_id)
@@ -168,8 +169,9 @@ class CoaService:
             group_id=group_id,
             cash_flow_category=cash_flow_category,
             type_=type_,
-            is_total=is_total,
-            is_fixed=False,
+            is_system=False,
+            description=description,
+            is_active=is_active,
         )
         return CoaAccountResponse.model_validate(account)
 
@@ -186,9 +188,10 @@ class CoaService:
         cash_flow_category: str | None,
         update_cash_flow: bool,
         type_: str | None,
-        is_total: bool | None,
+        description: str | None,
+        is_active: bool | None,
     ) -> CoaAccountResponse:
-        """Update a COA account, raising 403 if fixed or 404 if not found."""
+        """Update a COA account, raising 403 if system or 404 if not found."""
         await self._require_business(business_id, owner_id)
         account = await self.repo.get_account(business_id, account_id)
         if not account:
@@ -196,10 +199,10 @@ class CoaService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="COA account not found",
             )
-        if account.is_fixed:
+        if account.is_system:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This account is fixed and cannot be modified.",
+                detail="This account is system-managed and cannot be modified.",
             )
         updated = await self.repo.update_account(
             business_id,
@@ -212,14 +215,15 @@ class CoaService:
             code,
             update_code,
             type_,
-            is_total,
+            description=description,
+            is_active=is_active,
         )
         return CoaAccountResponse.model_validate(updated)
 
     async def delete_account(
         self, business_id: str, account_id: str, owner_id: str
     ) -> None:
-        """Delete a COA account, raising 403 if fixed or 404 if not found."""
+        """Delete a COA account, raising 403 if system or 404 if not found."""
         await self._require_business(business_id, owner_id)
         account = await self.repo.get_account(business_id, account_id)
         if not account:
@@ -227,10 +231,10 @@ class CoaService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="COA account not found",
             )
-        if account.is_fixed:
+        if account.is_system:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This account is fixed and cannot be deleted.",
+                detail="This account is system-managed and cannot be deleted.",
             )
         await self.repo.delete_account(business_id, account_id)
 
@@ -246,5 +250,5 @@ class CoaService:
         await self.repo.reorder_accounts(business_id, group_id, ids)
 
     async def seed_default_coa(self, business_id: str) -> None:
-        """Seed the default fixed COA for a newly created business (no ownership check)."""
+        """Seed the default system COA for a newly created business (no ownership check)."""
         await self.repo.seed_default_coa(business_id)
